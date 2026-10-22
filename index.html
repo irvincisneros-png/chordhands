@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ChordHands</title>
+<meta name="description" content="Play chords with your hands. A webcam, keyboard and touch chord instrument for music class.">
+<meta name="theme-color" content="#15111f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23251d3a'/%3E%3Crect x='14' y='30' width='7' height='22' rx='3.5' fill='%23ffb454'/%3E%3Crect x='24' y='20' width='7' height='32' rx='3.5' fill='%23ff6f91'/%3E%3Crect x='34' y='14' width='7' height='38' rx='3.5' fill='%235ee6c4'/%3E%3Crect x='44' y='24' width='7' height='28' rx='3.5' fill='%23c77dff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-mode="play">
+<a class="skip" href="#pad">Skip to chord pad</a>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#251d3a"/><rect x="14" y="30" width="7" height="22" rx="3.5" fill="#ffb454"/><rect x="24" y="20" width="7" height="32" rx="3.5" fill="#ff6f91"/><rect x="34" y="14" width="7" height="38" rx="3.5" fill="#5ee6c4"/><rect x="44" y="24" width="7" height="28" rx="3.5" fill="#c77dff"/></svg>
+    <h1>ChordHands</h1>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Mode">
+    <button role="tab" data-mode="play" aria-selected="true">Play</button>
+    <button role="tab" data-mode="songs" aria-selected="false">Songs</button>
+    <button role="tab" data-mode="learn" aria-selected="false">Learn</button>
+  </nav>
+  <div class="top-actions">
+    <button id="btnCamera" class="btn primary" aria-pressed="false">Start camera</button>
+    <button id="btnGuide" class="btn" aria-haspopup="dialog">Hand guide</button>
+    <button id="btnProjector" class="btn" aria-pressed="false" title="Projector mode (P)">Projector</button>
+    <button id="btnPanel" class="btn only-narrow" aria-expanded="false" aria-controls="side">Settings</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden role="status" aria-live="polite"><span id="bannerText"></span><button id="bannerClose" class="btn small" aria-label="Dismiss message">OK</button></div>
+<div id="audioHint" class="banner soft" role="status">Press any key or tap anywhere to turn on sound.</div>
+
+<main class="layout">
+  <section class="main-col">
+
+    <!-- PLAY + LEARN -->
+    <section id="stageView" class="view" aria-label="Chord display">
+      <div id="tutorialCard" class="card tutorial" hidden></div>
+      <div class="card stage">
+        <div class="stage-top">
+          <div class="chord-big" id="chordBig" aria-live="polite">
+            <div class="roman" id="chordRoman">–</div>
+            <div class="name" id="chordName">Ready</div>
+            <div class="notes" id="chordNotes">Make a shape, or press 1 – 7</div>
+          </div>
+          <div class="staff-wrap" id="staffWrap"><div id="staff"></div></div>
+        </div>
+        <div class="piano" id="piano"></div>
+        <div class="keyline" id="keyLine" aria-label="Chords in this key"></div>
+      </div>
+      <div class="card rec" id="recorderCard">
+        <div class="rec-row">
+          <strong>Free-play recorder</strong>
+          <button id="recStart" class="btn small">Record</button>
+          <button id="recPlay" class="btn small" disabled>Play back</button>
+          <button id="recCopy" class="btn small" disabled>Copy chords</button>
+          <output id="recText" class="rec-text">Record a chord sequence, then play it back or copy it as text.</output>
+        </div>
+      </div>
+    </section>
+
+    <!-- SONGS -->
+    <section id="songView" class="view" hidden aria-label="Song tutorials"></section>
+
+    <!-- PAD -->
+    <section class="card padcard" id="pad" aria-label="Chord pad">
+      <div class="pad-head">
+        <h2>Chord pad <span class="sub" id="padKey"></span></h2>
+        <div class="pad-tools" role="group" aria-label="Chord colour and modifiers">
+          <button class="chip" data-colour="triad" aria-pressed="true">Triad <kbd>Q</kbd></button>
+          <button class="chip" data-colour="inv1" aria-pressed="false">1st inv <kbd>W</kbd></button>
+          <button class="chip" data-colour="seventh" aria-pressed="false">7th <kbd>E</kbd></button>
+          <button class="chip" data-colour="dom7" aria-pressed="false">Dom 7 <kbd>R</kbd></button>
+          <button class="chip" data-colour="sus4" aria-pressed="false">sus4 <kbd>T</kbd></button>
+          <button class="chip" data-colour="add9" aria-pressed="false">add9 <kbd>Y</kbd></button>
+          <span class="sep"></span>
+          <button class="chip" id="btnFlip" aria-pressed="false" title="Major to minor (hold Shift)">Flip major/minor <kbd>Shift</kbd></button>
+          <button class="chip" id="btnFlat" aria-pressed="false" title="Lower the chord root a semitone">♭</button>
+          <button class="chip" id="btnSharp" aria-pressed="false" title="Raise the chord root a semitone">♯</button>
+          <span class="sep"></span>
+          <button class="chip" id="btnOctDown" aria-label="Octave down">Oct −<kbd>Z</kbd></button>
+          <button class="chip" id="btnOctUp" aria-label="Octave up">Oct +<kbd>X</kbd></button>
+          <button class="chip" id="btnHold" aria-pressed="false">Hold</button>
+          <button class="chip" id="btnStrum" title="Re-strike the chord (Space)">Strum <kbd>Space</kbd></button>
+        </div>
+      </div>
+      <div class="pad-grid" id="padGrid" role="group" aria-label="Seven chords of the key"></div>
+    </section>
+  </section>
+
+  <aside class="side-col" id="side" aria-label="Camera and settings">
+    <section class="card camcard" id="camCard">
+      <div class="cam-box" id="camBox">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="cam-empty" id="camEmpty">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1.5l4-2.5v12l-4-2.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="currentColor"/></svg>
+          <p>Camera is off.<br>Play with the pad, keys 1–7, or touch.</p>
+        </div>
+        <div class="cam-status" id="camStatus" hidden></div>
+        <div class="cam-live" id="camLive" hidden></div>
+      </div>
+      <p class="privacy">Your video never leaves this device. Hand tracking runs locally in your browser.</p>
+    </section>
+
+    <section class="card settings" id="settings">
+      <details open><summary>Sound</summary>
+        <label>Instrument <select data-setting="preset"></select></label>
+        <label>Style <select data-setting="style"></select></label>
+        <label class="arp-only">Arpeggio <select data-setting="arpPattern"><option value="up">Up</option><option value="updown">Up and down</option><option value="random">Random</option></select></label>
+        <label class="arp-only">Speed <select data-setting="arpDiv" data-number><option value="2">8th notes</option><option value="4">16th notes</option></select></label>
+        <label>Volume <input type="range" data-setting="volume" min="0" max="1" step="0.01"></label>
+        <label>Reverb <input type="range" data-setting="reverb" min="0" max="0.7" step="0.01"></label>
+        <label class="check"><input type="checkbox" data-setting="bass"> Bass note</label>
+      </details>
+      <details open><summary>Key and harmony</summary>
+        <label>Key <select data-setting="keyRoot" data-number id="selKey"></select></label>
+        <label>Mode <select data-setting="mode"><option value="major">Major</option><option value="minor">Minor</option></select></label>
+        <label>Harmony <select data-setting="harmony"><option value="diatonic">Diatonic (chords follow the key)</option><option value="free">Free (all major, tilt for minor)</option></select></label>
+        <label class="check"><input type="checkbox" data-setting="accidentals"> Hand height shifts root ♯/♭ (camera)</label>
+      </details>
+      <details open><summary>Hands</summary>
+        <label>Mode <select data-setting="handsMode"><option value="two">Two hands</option><option value="one">One hand (left only)</option></select></label>
+        <label class="check"><input type="checkbox" data-setting="swapHands"> Swap hands (if chords follow the wrong hand)</label>
+        <label class="check"><input type="checkbox" data-setting="rightSilent"> No right hand = silent</label>
+      </details>
+      <details open><summary>Beat</summary>
+        <label class="check"><input type="checkbox" data-setting="beatOn"> Drum loop</label>
+        <label>Pattern <select data-setting="beatPattern"></select></label>
+        <label class="check"><input type="checkbox" data-setting="metronome"> Metronome click</label>
+        <label>Tempo <input type="range" data-setting="bpm" min="60" max="160" step="1"> <output data-out="bpm"></output></label>
+      </details>
+      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R T Y</kbd> colour · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
+    </section>
+  </aside>
+</main>
+
+<dialog id="guide" class="guide" aria-labelledby="guideTitle"></dialog>
+<dialog id="results" class="guide" aria-labelledby="resultsTitle"></dialog>
+
+<script type="module" src="src/main.js"></script>
+<noscript><p style="padding:2rem">ChordHands needs JavaScript.</p></noscript>
+</body>
+</html>

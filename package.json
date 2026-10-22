@@ -1,0 +1,1 @@
+{ "name": "chordhands", "private": true, "type": "module", "description": "No dependencies; package.json only marks .js files as ES modules for node --test." }
