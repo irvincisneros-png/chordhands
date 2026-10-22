@@ -14,6 +14,7 @@ import { renderGuide } from "./ui/guide.js";
 import { drawOverlay } from "./ui/overlay.js";
 import { createSongPanel } from "./ui/songpanel.js";
 import { createTutorialPanel } from "./ui/tutorialpanel.js";
+import { createGestureGuide } from "./ui/gestureguide.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -27,7 +28,7 @@ let keyOverride = null;
 let mode = "play";
 const baseKey = () => keyFromPc(settings.keyRoot, settings.mode);
 const effKey = () => keyOverride || baseKey();
-const effHarmony = () => (mode === "learn" ? "diatonic" : settings.harmony);
+const effHarmony = () => settings.harmony; // "classic" (default) or "diatonic"
 const performer = new Performer(audio, { key: effKey(), harmony: effHarmony() });
 const tracker = new GestureTracker();
 const cam = new HandCamera();
@@ -58,6 +59,8 @@ audio.volume = settings.volume; audio.reverbAmt = settings.reverb;
 
 // ---------------- display ----------------
 const piano = createPiano($("#piano"));
+const gestureGuide = createGestureGuide($("#gestureGuide"));
+gestureGuide.setToggles({ raiseOn: settings.raiseOn, lowerOn: settings.lowerOn });
 const pad = createPad($("#padGrid"), (d) => (d ? performer.press("pad", d) : performer.release("pad")));
 renderStaff($("#staff"), null);
 
@@ -65,6 +68,7 @@ function refreshKeyUI() {
   const key = effKey();
   const chords = keyChords(key, effHarmony());
   pad.update(chords);
+  gestureGuide.setNames(chords.map((c) => pretty(c.symbol)));
   $("#padKey").textContent = "· " + pretty(key.name.replace(/m$/, "")) + (key.mode === "minor" ? " minor" : " major");
   $("#keyLine").innerHTML = chords.map((c, i) => `<span data-d="${i + 1}" style="--c:var(--deg${i + 1})">${pretty(c.symbol)}</span>`).join("");
 }
@@ -128,6 +132,7 @@ function applySetting(name, v) {
       if (name === "mode") fillKeys();
       performer.setKey(effKey()); refreshKeyUI(); showChord(performer.info); break;
     case "harmony": performer.setHarmony(effHarmony()); refreshKeyUI(); break;
+    case "raiseOn": case "lowerOn": gestureGuide.setToggles({ [name]: v }); break;
     case "bpm": audio.setBpm(v); drums.setBpm(v); break;
     case "beatOn": case "beatPattern": case "metronome": applyBeat(); break;
     default: break;
@@ -255,7 +260,7 @@ async function startCamera() {
     btn.textContent = "Stop camera"; btn.setAttribute("aria-pressed", "true");
     performer.setGestureEnabled(true);
     liveEl.hidden = false;
-    announce("Camera on. Show your left hand to choose chords.");
+    announce("Camera on. Your left hand picks the chord and your right hand shapes it.");
   } catch (err) {
     camStatus("");
     banner(friendlyCameraError(err));
@@ -270,28 +275,30 @@ function stopCamera() {
   drawOverlay($("#overlay"), null);
   $("#btnCamera").textContent = "Start camera"; $("#btnCamera").setAttribute("aria-pressed", "false");
   performer.setGestureEnabled(false);
-  tracker.leftStab.stable = "none"; tracker.rightStab.stable = "triad";
+  tracker.reset(); gestureGuide.reset(); performer.setGesture(null);
 }
 $("#btnCamera").addEventListener("click", () => (camOn ? stopCamera() : startCamera()));
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
-const COLOUR_NAME = { mute: "mute", triad: "triad", inv1: "1st inv", seventh: "7th", dom7: "dom 7" };
+const colourLabel = (q, minor) => ["", "root", "1st inv", minor ? "m7" : "maj7", minor ? "dim7" : "dom7"][q] || "";
+/** One-handed if the setting says so, or while a Learn step asks for the left hand only. */
+const oneHandedNow = () => (mode === "learn" && tutorial.active && tutorial.hands ? tutorial.hands === "one" : settings.handsMode === "one");
 cam.onFrame = ({ hands, t, aspect, fps }) => {
-  const one = settings.handsMode === "one";
-  tracker.configure({ aspect, oneHanded: one, rightSilent: settings.rightSilent, accidentals: settings.accidentals });
+  const one = oneHandedNow();
+  tracker.configure({ aspect, oneHanded: one, lenientRight: settings.rightLenient, raiseOn: settings.raiseOn, lowerOn: settings.lowerOn });
   const roles = assignHands(hands, { swap: settings.swapHands, oneHanded: one });
   const out = tracker.update(t, roles);
   performer.setGesture(out);
-  if (out.strum) performer.strum();
+  if (out.strum && settings.style !== "hold") performer.strum(); // pinch-strum only in Strum / Arpeggio styles
+  gestureGuide.update(out, { oneHanded: one });
   const L = out.info.left, R = out.info.right;
   const labels = {};
-  if (L.present) labels.left = { text: "Chord " + (L.degree === 0 ? "rest" : L.degree == null ? "?" : ROMAN[L.degree - 1]) + (L.flip && L.degree ? " (minor flip)" : ""), progress: out.progress.left };
-  if (R.present) labels.right = { text: "Colour " + (COLOUR_NAME[["mute", "triad", "inv1", "seventh", "dom7"][R.count]] || "") + (R.thumb ? " · oct ↓" : ""), progress: out.progress.right };
+  if (L.present) labels.left = { text: L.degree === 0 ? "Chord: none" : "Chord " + ROMAN[L.degree - 1] + (L.minor ? " minor" : " major") + (L.band > 0 && settings.raiseOn ? " ♯" : L.band < 0 && settings.lowerOn ? " ♭" : ""), progress: out.progress.left };
+  if (R.present) labels.right = { text: R.quality === 0 ? "Colour: mute" : "Colour " + R.quality + ": " + colourLabel(R.quality, L.present && L.minor) + (R.thumb ? " · oct ↓" : ""), progress: out.progress.right };
   drawOverlay($("#overlay"), roles, labels);
-  const sideName = (r) => (r && r.present ? r.physical : "");
+  const hasL = L.present ? (L.degree === 0 ? "no fingers" : ROMAN[L.degree - 1]) : "none";
   liveEl.innerHTML = hands.length
-    ? `<span>Chord hand: ${L.present ? `${L.count + (L.thumb ? "+thumb" : "")} fingers` : "none"}</span><span>Colour hand: ${one ? "off" : R.present ? R.count + " fingers" : "none"}</span><span>${fps || 0} fps ${cam.delegate}</span>`
+    ? `<span>Chord hand: ${hasL}</span><span>Colour hand: ${one ? "off (one hand)" : R.present ? R.quality + " finger" + (R.quality === 1 ? "" : "s") : "none"}</span><span>${fps || 0} fps ${cam.delegate}</span>`
     : `<span>No hands in view. Hold them up, palms to the camera.</span><span>${fps || 0} fps ${cam.delegate}</span>`;
-  void sideName;
 };
 
 // ---------------- recorder ----------------
@@ -332,7 +339,7 @@ function setKeyOverride(k) {
 }
 const songs = createSongPanel($("#songView"), { performer, audio, drums, getSettings: () => ({ ...settings, harmony: effHarmony() }), setKeyOverride, announce });
 const tutorial = createTutorialPanel($("#tutorialCard"), {
-  onStart() { setKeyOverride(makeKey("C")); performer.setHarmony("diatonic"); refreshKeyUI(); },
+  onStart() { setKeyOverride(makeKey("C")); refreshKeyUI(); },
   onEnd() { setMode("play"); },
   announce,
 });

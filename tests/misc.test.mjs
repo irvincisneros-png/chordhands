@@ -17,10 +17,10 @@ test("recorder exports chord text and skips repeats/silence", () => {
   assert.equal(r.toText(), "C | G | Am | F");
   assert.ok(r.duration >= 3000);
 });
-test("tutorial advances through I -> IV -> iv -> V7 -> I", () => {
+test("tutorial advances through I -> IV -> iv -> V -> V7 -> I", () => {
   const C = makeKey("C");
   const tut = new Tutorial(STEPS, { holdMs: 300 });
-  const seq = [{ degree: 1 }, { degree: 4 }, { degree: 4, flip: true }, { degree: 5, ext: "seventh" }, { degree: 1 }];
+  const seq = [{ degree: 1 }, { degree: 4 }, { degree: 4, flip: true }, { degree: 5 }, { degree: 5, ext: "dom7" }, { degree: 1 }];
   let t = 0;
   for (const s of seq) {
     const chord = buildChord(C, s);
@@ -37,4 +37,9 @@ test("tutorial ignores wrong chords", () => {
   tut.update(0, buildChord(C, { degree: 5 }));
   assert.equal(tut.update(1000, buildChord(C, { degree: 5 })).advanced, false);
   assert.equal(tut.index, 0);
+});
+test("tutorial: steps 1-3 are left-hand only, the right hand joins at step 4", () => {
+  assert.deepEqual(STEPS.map((s) => s.hands), ["one", "one", "one", "two", "two", "two"]);
+  const tut = new Tutorial(STEPS);
+  assert.equal(tut.hands, "one");
 });

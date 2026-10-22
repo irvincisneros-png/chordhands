@@ -224,13 +224,14 @@ export class AudioEngine {
     this.reverbAmt = a;
     if (this.ctx) this.send.gain.setTargetAtTime(a, this.now, 0.05);
   }
-  /** Live expression 0..1 from hand height. */
-  setExpression(x) { if (this.ctx) this.expr.gain.setTargetAtTime(Math.max(0, x), this.now, 0.06); }
-  /** brightness 0..1 (hand tilt) or null for fully open. */
-  setBrightness(b) {
+  /** Live expression 0..1 from hand height (a short ramp, about 50 ms). */
+  setExpression(x) { if (this.ctx) this.expr.gain.setTargetAtTime(Math.max(0, x), this.now, 0.02); }
+  /** Tone filter from the colour-hand tilt: {freq, q}, or null for fully open. Smoothed with a 40 ms time constant. */
+  setFilter(f) {
     if (!this.ctx) return;
-    const f = b == null ? 12000 : 250 * Math.pow(20, Math.min(1, Math.max(0, b)));
-    this.tone.frequency.setTargetAtTime(f, this.now, 0.06);
+    const freq = f ? f.freq : 12000, q = f ? f.q : 0.5;
+    this.tone.frequency.setTargetAtTime(freq, this.now, 0.04);
+    this.tone.Q.setTargetAtTime(q, this.now, 0.04);
   }
 
   // ---- chords

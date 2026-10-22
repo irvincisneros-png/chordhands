@@ -20,60 +20,67 @@ It also works with **no camera at all** (keyboard, mouse, touch), because many s
 - Key: any of 12 roots, major or (natural) minor mode. Scale degree 1–7 → diatonic triad.
 - Chord = { degree, root pc, quality, extension, inversion } → MIDI notes (voice-led into a comfortable
   range C3–C5 so changes move minimally; bass note an octave below root).
-- Qualities: maj, min, dim, aug(optional). **Flip** toggles major↔minor (dim → min).
-- Extensions: triad, 1st inversion, sus2, sus4, 7 (diatonic 7th: maj7/dom7/m7/m7b5 as the key dictates), dom7 (force b7 on any
-  chord), add9.
+- Qualities: maj, min, dim, aug(optional). **Flip** toggles major↔minor (dim → min). Harmony `classic` (default,
+  every degree major) or `diatonic`. `classicVoice()` gives the fixed Classic voicings (tonic in F#3..F4, VII below it).
+- Extensions: triad, 1st inversion, sus2, sus4, 7 (Classic: maj7 on major / m7 on minor; Diatonic: the key's own 7th),
+  dom7 (force b7 on any chord), dim7 (Classic dom7 on a minor chord), add9.
 - Name helpers: chord symbol ("Dm7", "G7", "Fmaj7", "Bdim"), roman numeral ("ii7", "V7", "IV"), note names
   with correct sharps/flats per key.
 - `parseRoman("V7")`, `parseRoman("bVII")` → chord in key (supports b/# prefix for borrowed chords in songs).
 
 ## Gesture control (`src/gestures.js`, logic unit-tested on synthetic landmark arrays)
-Use the user's *real* left/right (MediaPipe handedness is mirrored for a selfie camera — handle and expose a
-"swap hands" toggle). Smooth with a short debounce (a gesture must hold ~120 ms before the chord changes)
-so chords don't flicker.
+The default **Classic** scheme copies the hand controls of the app that inspired ChordHands, so students can
+move between them. Every rule and number (finger/thumb tests, tilt measure, height bands, debounce, volume and
+filter curves, voicings) is in **`docs/ORIGINAL-CONTROLS.md`**; `RULES` in `src/gestures.js` holds the constants.
+Summary:
 
-Finger "extended" = tip farther from wrist than PIP (distance-based, so it works when the hand is tilted);
-thumb extended = tip far from index MCP.
-
-Gestures deliberately follow the same *musical* scheme as the original (so students who know it feel at home):
-
-**Left hand — which chord (scale degree)**
+**Left hand (the hand MediaPipe labels Left) - which chord**
 | shape | degree |
 |---|---|
-| 1–5 fingers counted index→pinky then thumb (1=index, 2=+middle, 3=+ring, 4=+pinky, 5=open palm) | I–V |
-| index + pinky, thumb tucked (🤘) | VI |
-| index + pinky + thumb out (🤟) | VII |
-| fist / no hand | silence |
-- **Harmony mode** setting: *Diatonic* (default — chords follow the key: ii, iii, vi minor, vii° dim) or
-  *Free* (every degree major; tilt for minor — the original's behaviour). In both, tilting the left hand
-  outward (roll past ~25°, hysteresis) **flips** major↔minor.
-- Optional "accidentals" toggle: left-hand height — top band raises the root a semitone, bottom 20 % lowers it
-  (lets students reach bVII, #iv etc.). Off by default.
+| number of digits up, thumb included (any digits): 1, 2, 3, 4, 5 | I - V |
+| index + pinky only (thumb in) | VI |
+| index + pinky + thumb out | VII |
+| no digit up (fist) / no hand | silence |
+- Tilt inward (or upright) = **major**; tilt outward = **minor**. Measured from the wrist x against the middle/ring
+  knuckles (dead zone between them), no hysteresis. Applies to every degree.
+- Optional, off by default (Settings): chord hand in the top half of the picture raises the root a semitone, a hand
+  reaching the bottom fifth lowers it. Two separate toggles.
+- **Harmony: Classic (default)**: roots from the key's scale (VII a semitone *below* the tonic), every chord
+  major unless tilted. **Diatonic (optional)**: chords follow the key (ii, iii, vi minor, vii dim) and the tilt flips them.
 
-**Right hand — chord colour, octave, volume, tone**
-| fingers (index→pinky; thumb ignored for count) | effect |
+**Right hand (Right label) - chord shape, octave, volume, tone**
+| fingers (thumb not counted) | effect |
 |---|---|
-| 0 (fist) | mute (fade out) |
-| 1 | root-position triad |
+| 0 / no right hand | silence |
+| 1 | root position (root, 5th, octave root, octave 3rd) |
 | 2 | 1st inversion |
-| 3 | 7th (maj7 on major, m7 on minor, diatonic in Diatonic mode) |
-| 4 | dominant 7 (on minor: dim7) |
-- Thumb out → octave down. Hand height → volume (top loud). Tilt → filter brightness (~250 Hz–5 kHz).
-- Pinch (thumb tip to index tip) → strum/re-trigger (works in Strum/Arp styles).
-- If the right hand is absent in two-handed mode: use the last-held colour for 400 ms then default triad at
-  medium volume (more forgiving than silence for beginners). Setting "No right hand = silent" for the original feel.
+| 3 | maj7 (major) or m7 (minor) |
+| 4 | dom7 (major) or dim7 with b5 (minor) |
+- Thumb out = one octave lower. Wrist height = volume (y 0.05 full .. 0.95 silent, linear). Tilt inward = brighter:
+  filter 1200 Hz neutral, up to 5 kHz / Q 5.2; outward darker, down to 250 Hz / Q 2.2.
+- Pinch (thumb tip to index tip) re-strikes the chord, **only in Strum / Arpeggio styles**.
+- Right hand missing in two-handed mode = silence. Optional "Beginner help" (off by default) keeps the last
+  colour for about half a second, then a plain triad at medium volume.
 
-Debounce: a shape must be stable ~110 ms before it changes the chord; bridge dropouts of ≤150 ms.
-Show a small "lock-in" ring filling while a new shape is being confirmed. Same chord held = no re-trigger.
+**Timing**: a shape must hold 100 ms before the chord changes (any change of chord, quality, octave, tilt or
+pitch band restarts the timer); a lost hand is bridged for 50 ms; silence follows about 150 ms after a hand leaves.
+Same notes = no re-trigger. The **lock-in ring** fills during the 100 ms hold.
 
-**One-handed mode**: left hand only; right-hand functions available via on-screen buttons/keys.
+**One-handed mode**: only the left-hand-role hand is read; the colour is a root-position triad unless you set it
+with the pad chips / keys Q W E R; fixed volume; fixed 1200 Hz filter. "Swap hands" exchanges the roles.
 
-Show on the video: landmark skeleton, per-hand label ("chord" / "colour"), and the detected count — helps
-students learn the shapes.
+**Live gesture guide** (`src/ui/gestureguide.js`): beside (wide screens) or under the camera, the 7 left shapes and
+4 right shapes with the one being detected highlighted (brighter once locked in), the tilt state (major/minor,
+brighter/darker), octave state, pitch band, volume meter and the lock-in rings. Updated every camera frame from
+`GestureTracker` output; touches the DOM only when something changed.
+
+Show on the video: landmark skeleton, per-hand label ("Chord IV minor" / "Colour 3: maj7 · oct down"), and the
+lock-in ring.
 
 ## Non-camera controls (always on)
-- Keys `1`–`7` = degrees; hold `Shift` = flip; `Q W E R` = triad/1st inv/7th/dom7, `T` sus4, `Y` add9; `Space` = strum;
-  `Z`/`X` octave down/up; `,`/`.` inversion.
+- Keys `1`–`7` = degrees; hold `Shift` = minor (the tilt); `Q W E R` = right hand with 1, 2, 3, 4 fingers (root /
+  1st inversion / 7th / dom7, dim7 on minor); `T` sus4, `Y` add9 (extras); `Space` = strum; `Z`/`X` octave down/up
+  (the thumb); `,`/`.` inversion.
 - Big on-screen chord pad: 7 buttons (roman numeral + chord name in current key), pointer down = play,
   up = release (a "hold" toggle keeps sustaining). Touch friendly, multi-touch safe.
 
@@ -89,9 +96,9 @@ Audio unlocks on first user gesture.
 - **Piano strip** (2 octaves) highlighting sounding notes, root in accent colour.
 - **Staff** (treble, SVG) showing the chord's notes with correct accidentals.
 - Big chord name + roman numeral; the key's 7 chords listed with the current one highlighted.
-- **Guide** overlay: illustrated hand shapes (draw simple SVG hands, our own art) for every gesture.
+- **Hand guide** dialog: illustrated hand shapes (our own SVG art) and every rule above, in student words.
 - **Tutorial**: step-by-step guided lesson that waits for the student to make each shape (also completable with
-  keys/pad): I → IV → flip IV to iv → V7 → I.
+  keys/pad): I → IV → flip IV to iv (left hand only), then the right hand joins: V → V7 → I.
 
 ## Song tutorials (`src/songs.js` data + `src/songmode.js`)
 Chord progressions only — **never lyrics**. Each song: title, artist, original key, bpm, sections of bars, tip.

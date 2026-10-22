@@ -70,18 +70,18 @@
       <div class="pad-head">
         <h2>Chord pad <span class="sub" id="padKey"></span></h2>
         <div class="pad-tools" role="group" aria-label="Chord colour and modifiers">
-          <button class="chip" data-colour="triad" aria-pressed="true">Triad <kbd>Q</kbd></button>
-          <button class="chip" data-colour="inv1" aria-pressed="false">1st inv <kbd>W</kbd></button>
-          <button class="chip" data-colour="seventh" aria-pressed="false">7th <kbd>E</kbd></button>
-          <button class="chip" data-colour="dom7" aria-pressed="false">Dom 7 <kbd>R</kbd></button>
+          <button class="chip" data-colour="triad" aria-pressed="true" title="Right hand: 1 finger">Root <kbd>Q</kbd></button>
+          <button class="chip" data-colour="inv1" aria-pressed="false" title="Right hand: 2 fingers">1st inv <kbd>W</kbd></button>
+          <button class="chip" data-colour="seventh" aria-pressed="false" title="Right hand: 3 fingers (maj7 / m7)">7th <kbd>E</kbd></button>
+          <button class="chip" data-colour="dom7" aria-pressed="false" title="Right hand: 4 fingers (dom7 / dim7 on minor)">Dom 7 <kbd>R</kbd></button>
           <button class="chip" data-colour="sus4" aria-pressed="false">sus4 <kbd>T</kbd></button>
           <button class="chip" data-colour="add9" aria-pressed="false">add9 <kbd>Y</kbd></button>
           <span class="sep"></span>
-          <button class="chip" id="btnFlip" aria-pressed="false" title="Major to minor (hold Shift)">Flip major/minor <kbd>Shift</kbd></button>
+          <button class="chip" id="btnFlip" aria-pressed="false" title="Major to minor: the left-hand outward tilt (hold Shift)">Flip major/minor <kbd>Shift</kbd></button>
           <button class="chip" id="btnFlat" aria-pressed="false" title="Lower the chord root a semitone">♭</button>
           <button class="chip" id="btnSharp" aria-pressed="false" title="Raise the chord root a semitone">♯</button>
           <span class="sep"></span>
-          <button class="chip" id="btnOctDown" aria-label="Octave down">Oct −<kbd>Z</kbd></button>
+          <button class="chip" id="btnOctDown" aria-label="Octave down" title="Right-hand thumb out">Oct −<kbd>Z</kbd></button>
           <button class="chip" id="btnOctUp" aria-label="Octave up">Oct +<kbd>X</kbd></button>
           <button class="chip" id="btnHold" aria-pressed="false">Hold</button>
           <button class="chip" id="btnStrum" title="Re-strike the chord (Space)">Strum <kbd>Space</kbd></button>
@@ -93,6 +93,8 @@
 
   <aside class="side-col" id="side" aria-label="Camera and settings">
     <section class="card camcard" id="camCard">
+     <div class="cam-wrap">
+      <div class="cam-col">
       <div class="cam-box" id="camBox">
         <video id="video" playsinline muted></video>
         <canvas id="overlay"></canvas>
@@ -103,6 +105,9 @@
         <div class="cam-status" id="camStatus" hidden></div>
         <div class="cam-live" id="camLive" hidden></div>
       </div>
+      </div>
+      <div class="gesture-guide" id="gestureGuide" aria-label="What the camera sees"></div>
+     </div>
       <p class="privacy">Your video never leaves this device. Hand tracking runs locally in your browser.</p>
     </section>
 
@@ -119,13 +124,14 @@
       <details open><summary>Key and harmony</summary>
         <label>Key <select data-setting="keyRoot" data-number id="selKey"></select></label>
         <label>Mode <select data-setting="mode"><option value="major">Major</option><option value="minor">Minor</option></select></label>
-        <label>Harmony <select data-setting="harmony"><option value="diatonic">Diatonic (chords follow the key)</option><option value="free">Free (all major, tilt for minor)</option></select></label>
-        <label class="check"><input type="checkbox" data-setting="accidentals"> Hand height shifts root ♯/♭ (camera)</label>
+        <label>Harmony <select data-setting="harmony"><option value="classic">Classic (every chord major, tilt for minor)</option><option value="diatonic">Diatonic (chords follow the key)</option></select></label>
+        <label class="check"><input type="checkbox" data-setting="raiseOn"> Chord hand high = raise a semitone ♯ (camera)</label>
+        <label class="check"><input type="checkbox" data-setting="lowerOn"> Chord hand low = lower a semitone ♭ (camera)</label>
       </details>
       <details open><summary>Hands</summary>
-        <label>Mode <select data-setting="handsMode"><option value="two">Two hands</option><option value="one">One hand (left only)</option></select></label>
+        <label>Mode <select data-setting="handsMode"><option value="two">Two hands</option><option value="one">One hand (left only, root-position triads)</option></select></label>
         <label class="check"><input type="checkbox" data-setting="swapHands"> Swap hands (if chords follow the wrong hand)</label>
-        <label class="check"><input type="checkbox" data-setting="rightSilent"> No right hand = silent</label>
+        <label class="check"><input type="checkbox" data-setting="rightLenient"> Beginner help: keep sounding if the right hand drops out</label>
       </details>
       <details open><summary>Beat</summary>
         <label class="check"><input type="checkbox" data-setting="beatOn"> Drum loop</label>
@@ -133,7 +139,7 @@
         <label class="check"><input type="checkbox" data-setting="metronome"> Metronome click</label>
         <label>Tempo <input type="range" data-setting="bpm" min="60" max="160" step="1"> <output data-out="bpm"></output></label>
       </details>
-      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R T Y</kbd> colour · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
+      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R</kbd> right hand 1–4 fingers · <kbd>T Y</kbd> sus4 add9 · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
     </section>
   </aside>
 </main>

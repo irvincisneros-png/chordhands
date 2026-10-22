@@ -1,11 +1,11 @@
 // Performer: merges keyboard / pad / hand-gesture inputs into one chord and drives the audio engine.
 // No DOM here. UI subscribes with onChange(info).
-import { buildChord, voiceChord, qualityFor } from "./theory.js";
+import { buildChord, voiceChord, qualityFor, classicVoice, isClassic } from "./theory.js";
 
 const INVERSIONS = ["auto", 0, 1, 2];
 
 export class Performer {
-  constructor(audio, { key, harmony = "diatonic" }) {
+  constructor(audio, { key, harmony = "classic" }) {
     this.audio = audio;
     this.key = key;
     this.harmony = harmony;
@@ -73,28 +73,38 @@ export class Performer {
     return m.ext;
   }
 
+  /** Colour for the manual (keys / pad) path. In Classic harmony "dom7" on a minor chord is dim7, like the right hand. */
+  _manualColour(base) {
+    let { ext, inversion } = this.manual;
+    if (isClassic(this.harmony) && ext === "dom7") {
+      const q = qualityFor(this.key, base.degree, { flip: base.flip, harmony: this.harmony, alter: base.alter });
+      ext = q === "maj" || q === "aug" ? "dom7" : "dim7";
+    }
+    return { ...base, ext, inversion };
+  }
+
   _resolve() {
     if (this.external) return { src: "external", chord: this.external, octave: this.manual.octave };
     const k = this.layers.keys, p = this.layers.pad, g = this.gestureEnabled ? this.layers.gesture : null;
-    const manualBase = { ext: this.manual.ext, inversion: this.manual.inversion };
     let spec = null, source = null;
-    if (k.degree) { spec = { degree: k.degree, flip: k.flip || this.flipToggle, alter: this.alterToggle, ...manualBase }; source = "keys"; }
-    else if (p.degree) { spec = { degree: p.degree, flip: p.flip || this.flipToggle, alter: this.alterToggle, ...manualBase }; source = "pad"; }
+    if (k.degree) { spec = this._manualColour({ degree: k.degree, flip: k.flip || this.flipToggle, alter: this.alterToggle }); source = "keys"; }
+    else if (p.degree) { spec = this._manualColour({ degree: p.degree, flip: p.flip || this.flipToggle, alter: this.alterToggle }); source = "pad"; }
     else if (g && g.degree) {
-      spec = { degree: g.degree, flip: g.flip, alter: g.alter || 0, ...manualBase };
       source = "gesture";
+      const base = { degree: g.degree, flip: g.flip, alter: g.alter || 0 };
       let octave = this.manual.octave;
       if (g.colour) {
-        if (g.colour === "mute") return { src: source, chord: null, volume: g.volume, brightness: g.brightness };
-        const base = qualityFor(this.key, g.degree, { flip: g.flip, harmony: this.harmony, alter: g.alter || 0 });
-        if (g.colour === "triad") spec = { ...spec, ext: "triad", inversion: 0 };
-        else if (g.colour === "inv1") spec = { ...spec, ext: "triad", inversion: 1 };
-        else if (g.colour === "seventh") spec = { ...spec, ext: "seventh", inversion: 0 };
-        else if (g.colour === "dom7") spec = { ...spec, ext: base === "maj" || base === "aug" ? "dom7" : "dim7", inversion: 0 };
+        if (g.colour === "mute") return { src: source, chord: null, volume: g.volume, filter: g.filter };
+        const q = qualityFor(this.key, g.degree, { flip: g.flip, harmony: this.harmony, alter: g.alter || 0 });
+        spec = { ...base, ext: "triad", inversion: 0 };
+        if (g.colour === "inv1") spec.inversion = 1;
+        else if (g.colour === "seventh") spec.ext = "seventh";
+        else if (g.colour === "dom7") spec.ext = q === "maj" || q === "aug" ? "dom7" : "dim7";
         if (g.octaveDown) octave -= 1;
+      } else {
+        spec = this._manualColour(base); // one-handed: colour comes from the pad chips / keys
       }
-      const chord = buildChord(this.key, { ...spec, harmony: this.harmony });
-      return { src: source, chord, octave, volume: g.volume, brightness: g.brightness };
+      return { src: source, chord: buildChord(this.key, { ...spec, harmony: this.harmony }), octave, volume: g.volume, filter: g.filter };
     }
     if (!spec) return { src: null, chord: null };
     return { src: source, chord: buildChord(this.key, { ...spec, harmony: this.harmony }), octave: this.manual.octave };
@@ -104,7 +114,7 @@ export class Performer {
     const r = this._resolve();
     const a = this.audio;
     if (r.volume != null) a.setExpression(r.volume); else a.setExpression(1);
-    a.setBrightness(r.brightness ?? null);
+    a.setFilter(r.filter ?? null);
     const chord = r.chord;
     const sig = chord ? `${chord.symbol}|${chord.inversion}|${r.octave}|${r.src}` : "silent";
     if (sig === this.sig) return;
@@ -113,7 +123,8 @@ export class Performer {
       a.release();
       this.info = { chord: null, voiced: null, silent: true, source: r.src };
     } else {
-      const voiced = voiceChord(chord, this.prevBase, { inversion: chord.inversion, octaveShift: r.octave });
+      const classic = r.src !== "external" && isClassic(this.harmony) ? classicVoice(chord, this.key, { octaveShift: r.octave }) : null;
+      const voiced = classic || voiceChord(chord, this.prevBase, { inversion: chord.inversion, octaveShift: r.octave });
       this.prevBase = voiced.base;
       a.setChord(voiced);
       this.info = { chord, voiced, silent: false, source: r.src };

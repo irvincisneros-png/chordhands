@@ -11,7 +11,7 @@ export function createTutorialPanel(el, { onStart, onEnd, announce }) {
     if (!active) { el.hidden = true; return; }
     el.hidden = false;
     if (tut.done) {
-      el.innerHTML = `<div class="tut-done"><h2>Lesson complete!</h2><p>You played I, IV, iv, V7 and I: home, away, a darker turn, tension, and back home. Try the <b>Songs</b> tab next.</p><div class="dlg-actions"><button class="btn primary" id="tutAgain">Do it again</button><button class="btn" id="tutExit">Finish</button></div></div>`;
+      el.innerHTML = `<div class="tut-done"><h2>Lesson complete!</h2><p>You played I, IV, iv, V, V7 and I: home, away, a darker turn, tension, and back home. Try the <b>Songs</b> tab next.</p><div class="dlg-actions"><button class="btn primary" id="tutAgain">Do it again</button><button class="btn" id="tutExit">Finish</button></div></div>`;
       el.querySelector("#tutAgain").addEventListener("click", () => { tut.reset(); render(); });
       el.querySelector("#tutExit").addEventListener("click", () => onEnd());
       return;
@@ -45,5 +45,7 @@ export function createTutorialPanel(el, { onStart, onEnd, announce }) {
       }
     },
     get active() { return active; },
+    /** "one" | "two" | null: which hands the current step needs */
+    get hands() { return active && !tut.done ? tut.hands : null; },
   };
 }

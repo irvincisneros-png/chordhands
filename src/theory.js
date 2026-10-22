@@ -61,9 +61,12 @@ export function diatonicQuality(key, degree) {
   return DIATONIC[key.mode][degree - 1];
 }
 
+/** "classic" (every degree major, tilt/flip for minor; "free" is the old name) vs "diatonic". */
+export const isClassic = (harmony) => harmony === "classic" || harmony === "free";
+
 /** Quality of a chord on `degree` given harmony mode and flip. */
 export function qualityFor(key, degree, { flip = false, harmony = "diatonic", alter = 0 } = {}) {
-  let q = harmony === "free" || alter !== 0 ? "maj" : diatonicQuality(key, degree);
+  let q = isClassic(harmony) || alter !== 0 ? "maj" : diatonicQuality(key, degree);
   if (flip) q = q === "maj" ? "min" : q === "min" ? "maj" : q === "dim" ? "min" : "maj";
   return q;
 }
@@ -80,7 +83,7 @@ const QUAL_SYM = { maj: "", min: "m", dim: "dim", aug: "aug" };
 /**
  * buildChord(key, { degree, alter, flip, harmony, quality, ext, inversion })
  * ext: triad | sus2 | sus4 | seventh | dom7 | maj7 | dim7 | add9
- *  - seventh: diatonic 7th in diatonic harmony, else maj7 on major / m7 on minor
+ *  - seventh: diatonic 7th in diatonic harmony, else (classic) maj7 on major / m7 on minor
  *  - dom7:    adds a flat 7th to whatever the chord is
  */
 export function buildChord(key, o = {}) {
@@ -105,7 +108,7 @@ export function buildChord(key, o = {}) {
 
   let sev = null;
   if (ext === "seventh") {
-    const scaleSeventh = !o.quality && harmony !== "free" && !o.flip && alter === 0;
+    const scaleSeventh = !o.quality && !isClassic(harmony) && !o.flip && alter === 0;
     if (scaleSeventh) sev = mod(scale[(degree - 1 + 6) % 7] - scale[degree - 1], 12);
     else sev = quality === "min" || quality === "dim" ? 10 : 11;
   } else if (ext === "dom7") sev = 10;
@@ -232,6 +235,39 @@ export function voiceChord(chord, prevBase = null, { inversion = chord.inversion
     inversionUsed: best.inv,
     notes: notes.map((x) => ({ ...x, midi: x.midi + shift })),
   };
+}
+
+// ---------- Classic voicing ----------
+/** Tonic pitch in MIDI for a key root pc: the window F#3..F4 (54..65), e.g. A = 57, C = 60, G = 55. */
+export const classicTonicMidi = (pc) => 54 + mod(pc - 6, 12);
+
+/**
+ * The fixed Classic voicings (see docs/ORIGINAL-CONTROLS.md). Returns null when the chord is not one of them
+ * (sus / add9 / 2nd inversion / diminished triads), so callers fall back to voiceChord.
+ *   triad  : root, 5th, root+8ve, 3rd+8ve        1st inv: 3rd, 5th, root+8ve, 3rd+8ve
+ *   seventh: root, 3rd, 5th, 7th  (maj7 / m7 / dom7, or dim7 = root, b3, b5, bb7)
+ * The root sits on the key's scale degree above the tonic; degree VII sits a semitone BELOW the tonic.
+ */
+export function classicVoice(chord, key, { octaveShift = 0 } = {}) {
+  const t = chord.tones;
+  let plan = null; // [[semitones above root, tone index], ...]
+  if (chord.ext === "triad" && (chord.quality === "maj" || chord.quality === "min")) {
+    const third = t[1].semi;
+    const inv = chord.inversion;
+    if (inv === 1) plan = [[third, 1], [7, 2], [12, 0], [12 + third, 1]];
+    else if (inv === 0 || inv === "auto" || inv == null) plan = [[0, 0], [7, 2], [12, 0], [12 + third, 1]];
+  } else if (["seventh", "dom7", "maj7", "dim7"].includes(chord.ext) && chord.sev != null && t.length === 4) {
+    plan = t.map((x, i) => [x.semi, i]);
+  }
+  if (!plan) return null;
+  const offset = SCALES[key.mode][chord.degree - 1] + chord.alter - (chord.degree === 7 ? 12 : 0);
+  const root = classicTonicMidi(key.root) + offset;
+  const shift = 12 * octaveShift;
+  const notes = plan
+    .map(([semi, idx]) => ({ midi: root + semi + shift, ...chord.spelled[idx], isRoot: idx === 0 }))
+    .sort((a, b) => a.midi - b.midi);
+  const base = notes.map((n) => n.midi - shift);
+  return { base, midi: notes.map((n) => n.midi), bass: 36 + chord.rootPc, inversionUsed: chord.inversion === 1 ? 1 : 0, notes };
 }
 
 export const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);

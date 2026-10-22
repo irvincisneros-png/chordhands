@@ -4,3 +4,4 @@ import "./theory.test.mjs";
 import "./gestures.test.mjs";
 import "./songs.test.mjs";
 import "./misc.test.mjs";
+import "./classic.test.mjs";
