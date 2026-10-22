@@ -224,7 +224,7 @@ export class AudioEngine {
     this.reverbAmt = a;
     if (this.ctx) this.send.gain.setTargetAtTime(a, this.now, 0.05);
   }
-  /** Live expression 0..1 from the right index fingertip height (a short ramp, about 50 ms). */
+  /** Live expression 0..1 from the right-hand volume height (wrist or index fingertip) (a short ramp, about 50 ms). */
   setExpression(x) { if (this.ctx) this.expr.gain.setTargetAtTime(Math.max(0, x), this.now, 0.02); }
   /** Tone filter from the colour-hand tilt: {freq, q}, or null for fully open. Smoothed with a 40 ms time constant. */
   setFilter(f) {
@@ -232,6 +232,43 @@ export class AudioEngine {
     const freq = f ? f.freq : 12000, q = f ? f.q : 0.5;
     this.tone.frequency.setTargetAtTime(freq, this.now, 0.04);
     this.tone.Q.setTargetAtTime(q, this.now, 0.04);
+  }
+
+  // ---- theremin voice: one continuous oscillator, glided by setTargetAtTime (no re-triggering)
+  /**
+   * hz target, level 0..1, on = gate. tc = {pitch, volume} time constants in seconds.
+   * The pitch jumps straight to the target when the voice starts (no glide up from an old note).
+   */
+  thereminSet({ hz, level, on, tc, type = "sine" }) {
+    if (!this.ctx) return;
+    if (!on && !this.th) return;
+    const t = this.now;
+    if (!this.th) {
+      const o = this.ctx.createOscillator();
+      o.type = type; o.frequency.value = hz || 220;
+      const env = this.ctx.createGain(); env.gain.value = 0;
+      o.connect(env); env.connect(this.musicBus); o.start();
+      this.th = { o, env, on: false, type };
+    }
+    const th = this.th;
+    if (th.type !== type) { th.o.type = type; th.type = type; }
+    if (hz != null) {
+      if (on && !th.on) { th.o.frequency.cancelScheduledValues(t); th.o.frequency.setValueAtTime(hz, t); }
+      else th.o.frequency.setTargetAtTime(hz, t, tc.pitch);
+    }
+    th.env.gain.setTargetAtTime(on ? level : 0, t, tc.volume);
+    th.on = on;
+  }
+  /** Fade the theremin out and free its nodes. */
+  thereminStop() {
+    const th = this.th;
+    if (!th) return;
+    this.th = null;
+    const t = this.now;
+    th.env.gain.cancelScheduledValues(t);
+    th.env.gain.setTargetAtTime(0, t, 0.03);
+    try { th.o.stop(t + 0.4); } catch {}
+    setTimeout(() => { try { th.env.disconnect(); } catch {} }, 600);
   }
 
   // ---- chords

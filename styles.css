@@ -281,3 +281,47 @@ body.projector .pad-btn { min-height: 90px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ---------- practice chips ---------- */
+.pchips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+.pchip { display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 12px; border-radius: 999px; border: 2px solid var(--line); background: var(--card2); font-size: .85rem; transition: background .12s, border-color .12s; }
+.pchip b { font-weight: 800; }
+.pchip i { font-style: normal; color: var(--muted); font-weight: 700; }
+.pchip.ok { background: color-mix(in srgb, var(--good) 28%, var(--card2)); border-color: var(--good); }
+.pchip.ok i { color: var(--text); }
+.pchip.bad { background: color-mix(in srgb, var(--bad) 26%, var(--card2)); border-color: var(--bad); }
+.pchip.bad i { color: var(--text); }
+.cc.skip { border-color: var(--muted); border-style: dashed; }
+
+/* ---------- theremin ---------- */
+.instrument { margin: 0; }
+.instrument button[aria-checked="true"] { background: var(--accent2); color: #fff; }
+.th-grid { display: grid; grid-template-columns: minmax(0, 1fr) 110px minmax(0, 1fr); gap: 16px; align-items: stretch; margin-bottom: 10px; }
+.th-readout { display: grid; gap: 4px; align-content: center; text-align: center; transition: opacity .15s; }
+.th-readout.off .th-note, .th-readout.off .th-cents, .th-readout.off .th-hz { opacity: .45; }
+.th-label { font-size: .72rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); font-weight: 800; }
+.th-note { font-size: clamp(4rem, 9vw, 7.5rem); font-weight: 800; line-height: 1; color: var(--accent); }
+.th-cents { font-size: 1.5rem; font-weight: 800; min-height: 1.5em; }
+.th-readout.snapped .th-cents { color: var(--good); font-size: 1.05rem; }
+.th-hz { color: var(--muted); font-weight: 700; min-height: 1.2em; }
+.th-vol { display: grid; grid-template-columns: auto 1fr 3.2em; gap: 8px; align-items: center; margin-top: 8px; color: var(--muted); font-weight: 700; font-size: .85rem; }
+.th-volbar { height: 14px; background: rgba(255,255,255,.1); border-radius: 99px; overflow: hidden; }
+.th-volbar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.th-hint { min-height: 2.6em; color: var(--muted); font-size: .85rem; }
+.th-opts { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; align-items: center; color: var(--muted); font-weight: 600; font-size: .9rem; }
+.th-opts label { display: flex; gap: 6px; align-items: center; }
+.th-opts select { background: var(--card2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: 600 .9rem var(--font); }
+.th-opts input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+.th-ruler { position: relative; min-height: 380px; background: #120d1d; border: 1px solid var(--line); border-radius: 12px; }
+.th-tick { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid rgba(255,255,255,.22); }
+.th-tick span { position: absolute; left: 6px; bottom: 1px; font-size: .66rem; font-weight: 700; color: var(--muted); line-height: 1; }
+.th-tick.root { border-top: 2px solid var(--accent); }
+.th-tick.root span { color: var(--accent); font-size: .74rem; }
+.th-marker { position: absolute; left: 0; right: 0; height: 0; border-top: 3px solid var(--accent2); opacity: .55; z-index: 2; transition: bottom .03s linear; }
+.th-marker.on { opacity: 1; box-shadow: 0 0 12px var(--accent2); }
+.th-pad { position: relative; min-height: 380px; border-radius: 12px; border: 2px dashed var(--line); background: linear-gradient(180deg, rgba(255,180,84,.14), rgba(255,180,84,0) 70%); touch-action: none; cursor: crosshair; display: grid; place-content: center; padding: 12px; user-select: none; -webkit-user-select: none; }
+.th-pad.down { border-color: var(--accent); }
+.th-pad-hint { color: var(--muted); font-size: .85rem; font-weight: 600; text-align: center; pointer-events: none; }
+.th-dot { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--accent2); box-shadow: 0 0 16px var(--accent2); pointer-events: none; }
+@media (max-width: 820px) { .th-grid { grid-template-columns: minmax(0, 1fr) 96px; } .th-pad { grid-column: 1 / -1; min-height: 220px; } .th-ruler { min-height: 300px; } }
+body[data-instrument="theremin"] #pad, body[data-instrument="theremin"] #recorderCard { display: none; }

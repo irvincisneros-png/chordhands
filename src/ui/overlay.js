@@ -2,7 +2,8 @@
 // The video is mirrored with CSS; the canvas is NOT, so we mirror x ourselves and text stays readable.
 const BONES = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
 
-export function drawOverlay(canvas, roles, labels) {
+/** marks = {left?: landmarkIndex, right?: landmarkIndex}: the big marker dot goes on that landmark (the one that drives volume / pitch). */
+export function drawOverlay(canvas, roles, labels, marks) {
   const v = canvas.parentElement.querySelector("video");
   const w = (canvas.width = canvas.clientWidth * (window.devicePixelRatio > 1 ? 2 : 1));
   const h = (canvas.height = canvas.clientHeight * (window.devicePixelRatio > 1 ? 2 : 1));
@@ -22,8 +23,8 @@ export function drawOverlay(canvas, roles, labels) {
     for (const [a, b] of BONES) { const [x1, y1] = px(hand.lm[a]); const [x2, y2] = px(hand.lm[b]); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
     ctx.stroke();
     for (let i = 0; i < 21; i++) { const [x, y] = px(hand.lm[i]); ctx.beginPath(); ctx.arc(x, y, i % 4 === 0 && i ? w / 120 : w / 220, 0, 7); ctx.fill(); }
-    if (role === "right") {
-      const [tx, ty] = px(hand.lm[8]);
+    if (marks && marks[role] != null) {
+      const [tx, ty] = px(hand.lm[marks[role]]);
       ctx.lineWidth = Math.max(2, w / 200); ctx.strokeStyle = "#fff"; ctx.fillStyle = colour;
       ctx.beginPath(); ctx.arc(tx, ty, w / 70, 0, 7); ctx.fill(); ctx.stroke();
     }

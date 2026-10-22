@@ -5,3 +5,5 @@ import "./gestures.test.mjs";
 import "./songs.test.mjs";
 import "./misc.test.mjs";
 import "./classic.test.mjs";
+import "./theremin.test.mjs";
+import "./practice.test.mjs";

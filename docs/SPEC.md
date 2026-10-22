@@ -56,7 +56,7 @@ Summary:
 | 2 | 1st inversion |
 | 3 | maj7 (major) or m7 (minor) |
 | 4 | dom7 (major) or dim7 with b5 (minor) |
-- Thumb out = one octave lower. Volume = right index fingertip height (landmark 8; y 0.05 full .. 0.95 silent, linear; raise your right pointer finger higher for louder; a folded index still counts by its tip). Tilt inward = brighter:
+- Thumb out = one octave lower. Volume = right **wrist** height by default (landmark 0; y 0.05 full .. 0.95 silent, linear; raise your right hand higher for louder). Setting "Volume follows" can switch to the pointer fingertip (landmark 8). The overlay marker sits on whichever landmark is active. Tilt inward = brighter:
   filter 1200 Hz neutral, up to 5 kHz / Q 5.2; outward darker, down to 250 Hz / Q 2.2.
 - Pinch (thumb tip to index tip) re-strikes the chord, **only in Strum / Arpeggio styles**.
 - Right hand missing in two-handed mode = silence. Optional "Beginner help" (off by default) keeps the last
@@ -110,6 +110,22 @@ Chord progressions only — **never lyrics**. Each song: title, artist, original
 - Tempo slider (50–120 % speed), loop a section.
 - End screen: accuracy %, streak, stars (1–3). Best score per song saved in localStorage (try/catch).
 - Songs are browsable by difficulty; also "Progression Lab" classics (I–V–vi–IV, 12-bar blues, ii–V–I, Canon).
+
+## Theremin mode (`src/theremin.js`, `src/ui/thereminpanel.js`)
+Header switch **Chords / Theremin**. Right-hand wrist y = pitch, exponential 65 Hz (bottom) to 1200 Hz (top), about
+30 ms glide. Left-hand wrist y = volume, same linear curve as the chord volume, about 40 ms smoothing. Sound only
+while both hands are seen and volume > 0.02. Sine voice (triangle / saw optional). Optional **Snap to key** quantises
+to the key's scale with a short glide. Swap-hands exchanges the two roles. Shows a big note name with cents, a
+vertical pitch ruler marking the key's scale notes, and the volume level. Mouse / touch pad: pointer x = pitch,
+y = volume.
+
+## Practice feedback
+Under the NOW card: four chips, live from the performer state. **Chord** (root / degree), **Maj/Min**,
+**Colour** (triad / 1st inv / 7th / dom7; only checked when the target needs it: a 7th target such as V7 or Imaj7
+needs that 7th, a plain triad accepts root position or 1st inversion), **Octave** (informational). Green = match,
+red = no match. In Classic harmony minor needs the tilt and 7ths need the right-hand finger count. **Skip chord**
+counts as a skip; the end screen shows matched vs skipped. Optional setting "Practice: only the right chord
+sounds" (default off).
 
 ## Classroom extras
 - **Projector mode**: hides side panels, huge chord name + piano strip.

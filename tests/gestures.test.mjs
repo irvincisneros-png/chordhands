@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzeHand, classifyLeft, classifyRight, assignHands, Debouncer, GestureTracker,
-  fingerUp, thumbOut, tiltAmount, heightBand, fingertipVolume, filterFor, RULES,
+  fingerUp, thumbOut, tiltAmount, heightBand, fingertipVolume, wristVolume, handVolume, volumeFromY, filterFor, RULES,
 } from "../src/gestures.js";
 
 // Synthetic upright hand in RAW frame coordinates (y down), wrist at (ox, oy), palm length about 0.2.
@@ -239,7 +239,7 @@ test("every right-hand shape and the volume / filter come straight from the fram
   const tr = new GestureTracker({ aspect: 1 });
   const out = run(tr, 0, 300, { left: LH({ fingers: n4(1) }), right: RH({ fingers: n4(2), oy: 0.5, lean: 0.6 }) });
   assert.equal(out.colour, "inv1");
-  assert.ok(Math.abs(out.volume - fingertipVolume(RH({ fingers: n4(2), oy: 0.5, lean: 0.6 }).lm)) < 1e-9);
+  assert.ok(Math.abs(out.volume - wristVolume(RH({ fingers: n4(2), oy: 0.5, lean: 0.6 }).lm)) < 1e-9);
   assert.ok(out.filter.freq > 1200, "inward tilt opens the filter");
 });
 test("hands missing, two-handed: no right hand = silence (immediate volume 0, mute after the hold)", () => {
@@ -300,4 +300,26 @@ test("pinch strum is reported once per pinch on the colour hand", () => {
   const b = tr.update(33, { left: LH({ fingers: n4(1) }), right: pinched });
   assert.equal(a.strum, true);
   assert.equal(b.strum, false);
+});
+
+const near2 = (a, b) => assert.ok(Math.abs(a - b) < 1e-9);
+test("volume follows the WRIST by default, linear 0.05 full .. 0.95 silent", () => {
+  const w = (y) => wristVolume(hand({ side: "right", oy: y }));
+  assert.equal(w(0), 1); assert.equal(w(0.05), 1); assert.equal(w(0.95), 0); assert.equal(w(1), 0);
+  assert.ok(Math.abs(w(0.5) - 0.5) < 1e-9);
+  const lm = hand({ fingers: [1, 0, 0, 0], side: "right", oy: 0.4 }); // fingertip is far above the wrist
+  assert.equal(handVolume(lm), wristVolume(lm), "default source is the wrist");
+  assert.equal(handVolume(lm, "bogus"), wristVolume(lm), "unknown source falls back to the wrist");
+  assert.ok(Math.abs(handVolume(lm, "index") - fingertipVolume(lm)) < 1e-9);
+  assert.notEqual(handVolume(lm, "index"), handVolume(lm, "wrist"));
+  near2(volumeFromY(0.5), 0.5);
+});
+test("tracker: volumeFrom wrist (default) vs index (pointer fingertip)", () => {
+  const rh = RH({ fingers: n4(1), oy: 0.8 });
+  const lh = LH({ fingers: n4(1) });
+  const a = new GestureTracker({ aspect: 1 });
+  assert.equal(run(a, 0, 300, { left: lh, right: rh }).volume, wristVolume(rh.lm));
+  const b = new GestureTracker({ aspect: 1, volumeFrom: "index" });
+  assert.equal(run(b, 0, 300, { left: lh, right: rh }).volume, fingertipVolume(rh.lm));
+  assert.notEqual(wristVolume(rh.lm), fingertipVolume(rh.lm));
 });

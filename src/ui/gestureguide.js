@@ -44,7 +44,7 @@ export function createGestureGuide(el) {
         <span class="gg-chip" data-ftilt="in">Tilt in: brighter</span>
         <span class="gg-chip" data-ftilt="out">Tilt out: darker</span>
       </div>
-      <div class="gg-meter" aria-hidden="true"><div><i data-vol></i></div><span>Volume: raise your right pointer finger higher for louder</span></div>
+      <div class="gg-meter" aria-hidden="true"><div><i data-vol></i></div><span data-vol-text>Volume: raise your right wrist higher for louder</span></div>
     </section>
     <p class="gg-note" data-note></p>`;
 
@@ -94,6 +94,8 @@ export function createGestureGuide(el) {
   return {
     update(out, opts) { paint(out, opts); },
     reset() { last = ""; paint(null, null); },
+    /** "wrist" (default) or "index": which part of the right hand the volume follows */
+    setVolumeSource(src) { q("[data-vol-text]").textContent = src === "index" ? "Volume: raise your right pointer finger higher for louder" : "Volume: raise your right wrist higher for louder"; },
     setToggles(t) { toggles = { ...toggles, ...t }; last = ""; },
     /** names: chord symbols for degrees 1..7 in the current key */
     setNames(names) { qa("[data-name]").forEach((n, i) => (n.textContent = names[i] || "")); },

@@ -27,7 +27,7 @@ Conventions: landmarks are the raw camera frame, 0..1, **y grows downward**. The
 |---|---|
 | Quality | number of extended fingers (thumb **not** counted): 0 = silent, 1 = root position, 2 = 1st inversion, 3 = maj7 (major chord) or m7 (minor), 4 = dom7 (major) or dim7 with a b5 (minor). |
 | Octave | thumb out = every note one octave **lower**; thumb in = normal ("higher"). |
-| Volume | right index fingertip y (landmark 8), linear in the raw frame: y <= 0.05 full, y >= 0.95 silent. Higher fingertip = louder. This is the convention used by this family of gesture-synth apps (earlier versions here used the wrist). A folded index still uses its tip y; zero fingers already means silent. Gain ramps over 50 ms per frame; no other smoothing. |
+| Volume | right-hand **wrist** y (landmark 0), linear in the raw frame: y <= 0.05 full, y >= 0.95 silent. Higher hand = louder. Both sibling apps we looked at (gesture-synth-weld.vercel.app and gesturesynth.com) use the wrist, so the wrist is ChordHands' default. Settings has "Volume follows: Wrist (default) / Pointer fingertip"; the fingertip option uses the index tip (landmark 8, a folded index still uses its tip y) with the same curve. Zero fingers already means silent. Gain ramps over 50 ms per frame; no other smoothing. |
 | Filter | same tilt measure (inward positive). Neutral 1200 Hz, Q 0.7. Outward: cutoff 1200 - 950*t (down to 250 Hz), Q 0.7 + 1.5*t. Inward: cutoff 1200 + 3800*t (up to 5000 Hz), Q 0.7 + 4.5*t. Smoothed with a 40 ms time constant. |
 
 ## Timing, triggering, missing hands
@@ -68,5 +68,5 @@ Conventions: landmarks are the raw camera frame, 0..1, **y grows downward**. The
 - Our synth presets, envelopes and reverb are our own; a repeated chord after silence re-attacks instead of
   un-muting a drone. Because our presets have their own tone shaping, a global 1200 Hz neutral filter sounds darker.
 - One-handed fixed volume is 0.5 (not 0.2): our voices are quieter than the original's raw oscillators.
-- Extras kept optional: Diatonic harmony, pinch-strum (Strum and Arpeggio styles only), "Beginner help" for a
+- Extras kept optional: the Pointer-fingertip volume option, Theremin mode, Diatonic harmony, pinch-strum (Strum and Arpeggio styles only), "Beginner help" for a
   dropped right hand, sus4/add9 keys, manual octave/inversion keys, a bass note.

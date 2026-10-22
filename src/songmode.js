@@ -44,12 +44,56 @@ export function buildTimeline(song, key = null) {
   return { events, totalBeats: beat, sections, barLen, key: k };
 }
 
-/** Does the chord the player is sounding satisfy the target? (lenient on extensions) */
-export function chordsMatch(player, target) {
-  if (!player || !target) return false;
-  if (player.rootPc !== target.rootPc) return false;
-  if (target.ext === "sus2" || target.ext === "sus4") return true;
-  return player.quality === target.quality;
+const isMajorish = (q) => q === "maj" || q === "aug";
+const isSus = (c) => c.ext === "sus2" || c.ext === "sus4";
+const isTriadOnly = (c) => c.sev == null && !isSus(c) && c.ext !== "add9";
+
+/** What the right hand is doing, for the colour chip: triad | inv1 | seventh | dom7 | other. */
+export function colourOf(chord) {
+  if (!chord) return null;
+  if (isSus(chord) || chord.ext === "add9") return "other";
+  if (chord.sev == null) return chord.inversion === 1 ? "inv1" : chord.inversion === 2 ? "other" : "triad";
+  return chord.ext === "dom7" || chord.ext === "dim7" ? "dom7" : "seventh";
+}
+
+/**
+ * Compare what the player sounds with a song chord, one aspect at a time (used for the Practice chips).
+ * Returns {has, chord, majmin, colour, colourNeeded, octave, ok}; each aspect is true/false (null = not checked).
+ *  - chord: same root pitch class (the degree / root).
+ *  - majmin: same major-or-minor side. In the Classic scheme a diminished target is reached by the minor
+ *    tilt (Classic has no diminished triad), so it counts as minor there.
+ *  - colour: only checked when the target needs it. A target with a 7th (V7, Imaj7, ii7) needs that exact
+ *    7th; a plain triad needs a triad (root position or 1st inversion), so adding a 7th is wrong. sus/add9
+ *    targets skip the check.
+ *  - octave: the player is at the normal octave (informational; it never blocks a match).
+ *  - ok: chord && majmin && colour (a skipped aspect counts as passing).
+ */
+export function practiceMatch(player, target, { harmony = "classic", octave = 0 } = {}) {
+  if (!target) return { has: false, chord: false, majmin: false, colour: null, colourNeeded: false, octave: true, ok: false };
+  if (!player) return { has: false, chord: false, majmin: false, colour: null, colourNeeded: !isSus(target) && target.ext !== "add9", octave: true, ok: false };
+  const classic = harmony === "classic" || harmony === "free";
+  const chord = player.rootPc === target.rootPc;
+  const sus = isSus(target);
+  let majmin = null;
+  if (!sus) {
+    const t = target.quality === "dim" && classic && target.sev !== 9 ? "min" : target.quality;
+    majmin = isMajorish(player.quality) === isMajorish(t);
+    // an exact diminished seventh target needs the dim7 shape (minor tilt + 4 fingers in Classic)
+    if (t === "dim" && player.quality !== "dim") majmin = false;
+  }
+  let colour = null;
+  const colourNeeded = !sus && target.ext !== "add9";
+  if (colourNeeded) {
+    if (isTriadOnly(target)) colour = isTriadOnly(player) && !isSus(player) && player.inversion !== 2 && player.ext !== "add9";
+    else colour = player.sev === target.sev && !isSus(player);
+  }
+  const ok = chord && majmin !== false && colour !== false;
+  return { has: true, chord, majmin, colour, colourNeeded, octave: octave === 0, ok };
+}
+
+/** Does the chord the player is sounding satisfy the target? (see practiceMatch for the rules) */
+export function chordsMatch(player, target, opts) {
+  return practiceMatch(player, target, opts).ok;
 }
 
 // ---------------- tempo clock ----------------
@@ -108,8 +152,9 @@ export const ON_TIME_BEATS = 0.5; // match within this many beats after the chor
 export const EARLY_BEATS = 0.25;  // a correct chord this early still counts for the upcoming one
 
 export class Scorer {
-  constructor(events) {
+  constructor(events, { harmony = "classic" } = {}) {
     this.events = events;
+    this.harmony = harmony;
     this.rec = new Map(); // `${pass}:${i}` -> 'ok' | 'late' | 'miss'
     this.ratings = []; // chronological ratings for streak
     this.counts = { ok: 0, late: 0, miss: 0 };
@@ -141,7 +186,7 @@ export class Scorer {
     for (let i = 0; i < ev.length; i++) {
       const e = ev[i], key = `${pass}:${i}`;
       if (this.rec.has(key)) continue;
-      if (beat >= e.start - EARLY_BEATS && beat < e.start + e.dur && chordsMatch(chord, e.chord)) {
+      if (beat >= e.start - EARLY_BEATS && beat < e.start + e.dur && chordsMatch(chord, e.chord, { harmony: this.harmony })) {
         this._commit(key, beat <= e.start + ON_TIME_BEATS ? "ok" : "late", e.index);
       }
     }
@@ -160,28 +205,46 @@ export class Scorer {
 
 // ---------------- practice mode: waits for the right chord ----------------
 export class PracticeStepper {
-  constructor(events, { holdMs = 220, lockMs = 600 } = {}) {
+  constructor(events, { holdMs = 220, lockMs = 600, harmony = "classic" } = {}) {
     this.events = events;
     this.holdMs = holdMs;
     this.lockMs = lockMs;
+    this.harmony = harmony;
     this.index = 0;
     this.since = null;
     this.lock = null; // {chord, until}
     this.misses = 0;
+    this.matched = 0;
+    this.skipped = 0;
+    this.results = []; // 'matched' | 'skipped' per finished chord, in order
   }
   get done() { return this.index >= this.events.length; }
   get target() { return this.events[this.index] || null; }
+  _match(chord, target) { return chordsMatch(chord, target, { harmony: this.harmony }); }
+  /** Give up on the current chord: counts as a skip and moves on. */
+  skip(t = 0) {
+    if (this.done) return { advanced: false, done: true };
+    const just = this.target.chord;
+    this.skipped++;
+    this.results.push("skipped");
+    this.index++;
+    this.since = null;
+    this.lock = { chord: just, until: t + this.lockMs };
+    return { advanced: true, skipped: true, done: this.done };
+  }
   update(t, chord) {
     if (this.done) return { advanced: false, done: true };
     if (this.lock) {
-      if (t > this.lock.until || !chordsMatch(chord, this.lock.chord)) this.lock = null;
+      if (t > this.lock.until || !this._match(chord, this.lock.chord)) this.lock = null;
       else { this.since = null; return { advanced: false, done: false }; }
     }
-    if (chordsMatch(chord, this.target.chord)) {
+    if (this._match(chord, this.target.chord)) {
       if (this.since == null) this.since = t;
       if (t - this.since >= this.holdMs) {
         const just = this.target.chord;
         this.index++;
+        this.matched++;
+        this.results.push("matched");
         this.since = null;
         this.lock = { chord: just, until: t + this.lockMs };
         return { advanced: true, done: this.done };

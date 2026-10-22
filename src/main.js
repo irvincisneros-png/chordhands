@@ -3,7 +3,9 @@ import { keyFromPc, keyChords, makeKey, MAJOR_ROOTS, MINOR_ROOTS, pretty } from 
 import { AudioEngine, PRESET_LIST, STYLE_LIST } from "./audio.js";
 import { Drums, PATTERN_LIST } from "./drums.js";
 import { Performer } from "./performer.js";
-import { GestureTracker, assignHands } from "./gestures.js";
+import { GestureTracker, assignHands, volumeLandmark } from "./gestures.js";
+import { thereminFromHands } from "./theremin.js";
+import { createThereminPanel } from "./ui/thereminpanel.js";
 import { HandCamera, friendlyCameraError } from "./camera.js";
 import { Recorder } from "./recorder.js";
 import { loadSettings, saveSettings } from "./storage.js";
@@ -26,6 +28,8 @@ const audio = new AudioEngine();
 const drums = new Drums(audio);
 let keyOverride = null;
 let mode = "play";
+let instrument = "chords"; // "chords" | "theremin" (theremin lives in the Play tab)
+const thereminNow = () => instrument === "theremin" && mode === "play";
 const baseKey = () => keyFromPc(settings.keyRoot, settings.mode);
 const effKey = () => keyOverride || baseKey();
 const effHarmony = () => settings.harmony; // "classic" (default) or "diatonic"
@@ -61,6 +65,7 @@ audio.volume = settings.volume; audio.reverbAmt = settings.reverb;
 const piano = createPiano($("#piano"));
 const gestureGuide = createGestureGuide($("#gestureGuide"));
 gestureGuide.setToggles({ raiseOn: settings.raiseOn, lowerOn: settings.lowerOn });
+gestureGuide.setVolumeSource(settings.volumeFrom);
 const pad = createPad($("#padGrid"), (d) => (d ? performer.press("pad", d) : performer.release("pad")));
 renderStaff($("#staff"), null);
 
@@ -69,6 +74,7 @@ function refreshKeyUI() {
   const chords = keyChords(key, effHarmony());
   pad.update(chords);
   gestureGuide.setNames(chords.map((c) => pretty(c.symbol)));
+  if (typeof theremin !== "undefined" && thereminNow()) theremin.refreshKey();
   $("#padKey").textContent = "· " + pretty(key.name.replace(/m$/, "")) + (key.mode === "minor" ? " minor" : " major");
   $("#keyLine").innerHTML = chords.map((c, i) => `<span data-d="${i + 1}" style="--c:var(--deg${i + 1})">${pretty(c.symbol)}</span>`).join("");
 }
@@ -133,6 +139,7 @@ function applySetting(name, v) {
       performer.setKey(effKey()); refreshKeyUI(); showChord(performer.info); break;
     case "harmony": performer.setHarmony(effHarmony()); refreshKeyUI(); break;
     case "raiseOn": case "lowerOn": gestureGuide.setToggles({ [name]: v }); break;
+    case "volumeFrom": gestureGuide.setVolumeSource(v); break;
     case "bpm": audio.setBpm(v); drums.setBpm(v); break;
     case "beatOn": case "beatPattern": case "metronome": applyBeat(); break;
     default: break;
@@ -189,6 +196,7 @@ window.addEventListener("keydown", (e) => {
   if (t.tagName === "TEXTAREA" || (t.tagName === "INPUT" && t.type !== "checkbox" && t.type !== "range")) return;
   if (t.tagName === "SELECT") return;
   const d = degreeOf(e.code);
+  if (d && thereminNow()) return; // theremin mode: the chord keys are off
   if (d) {
     e.preventDefault();
     if (e.repeat) return;
@@ -227,8 +235,7 @@ window.addEventListener("blur", () => { keysDown.length = 0; performer.release("
 
 // ---------------- guide / projector ----------------
 const guide = $("#guide");
-renderGuide(guide);
-function openGuide() { if (!guide.open) guide.showModal(); }
+function openGuide() { if (!guide.open) { renderGuide(guide, { volumeFrom: settings.volumeFrom }); guide.showModal(); } }
 $("#btnGuide").addEventListener("click", openGuide);
 function setProjector(on) {
   document.body.classList.toggle("projector", on);
@@ -273,6 +280,7 @@ function stopCamera() {
   $("#camEmpty").hidden = false;
   liveEl.hidden = true; camStatus("");
   drawOverlay($("#overlay"), null);
+  theremin.setCamera(null);
   $("#btnCamera").textContent = "Start camera"; $("#btnCamera").setAttribute("aria-pressed", "false");
   performer.setGestureEnabled(false);
   tracker.reset(); gestureGuide.reset(); performer.setGesture(null);
@@ -283,8 +291,9 @@ const colourLabel = (q, minor) => ["", "root", "1st inv", minor ? "m7" : "maj7",
 /** One-handed if the setting says so, or while a Learn step asks for the left hand only. */
 const oneHandedNow = () => (mode === "learn" && tutorial.active && tutorial.hands ? tutorial.hands === "one" : settings.handsMode === "one");
 cam.onFrame = ({ hands, t, aspect, fps }) => {
+  if (thereminNow()) return thereminFrame(hands, fps);
   const one = oneHandedNow();
-  tracker.configure({ aspect, oneHanded: one, lenientRight: settings.rightLenient, raiseOn: settings.raiseOn, lowerOn: settings.lowerOn });
+  tracker.configure({ aspect, volumeFrom: settings.volumeFrom, oneHanded: one, lenientRight: settings.rightLenient, raiseOn: settings.raiseOn, lowerOn: settings.lowerOn });
   const roles = assignHands(hands, { swap: settings.swapHands, oneHanded: one });
   const out = tracker.update(t, roles);
   performer.setGesture(out);
@@ -294,12 +303,45 @@ cam.onFrame = ({ hands, t, aspect, fps }) => {
   const labels = {};
   if (L.present) labels.left = { text: L.degree === 0 ? "Chord: none" : "Chord " + ROMAN[L.degree - 1] + (L.minor ? " minor" : " major") + (L.band > 0 && settings.raiseOn ? " ♯" : L.band < 0 && settings.lowerOn ? " ♭" : ""), progress: out.progress.left };
   if (R.present) labels.right = { text: R.quality === 0 ? "Colour: mute" : "Colour " + R.quality + ": " + colourLabel(R.quality, L.present && L.minor) + (R.thumb ? " · oct ↓" : ""), progress: out.progress.right };
-  drawOverlay($("#overlay"), roles, labels);
+  // the volume marker sits on whichever landmark the volume follows (wrist by default)
+  drawOverlay($("#overlay"), roles, labels, { right: volumeLandmark(settings.volumeFrom) });
   const hasL = L.present ? (L.degree === 0 ? "no fingers" : ROMAN[L.degree - 1]) : "none";
   liveEl.innerHTML = hands.length
     ? `<span>Chord hand: ${hasL}</span><span>Colour hand: ${one ? "off (one hand)" : R.present ? R.quality + " finger" + (R.quality === 1 ? "" : "s") : "none"}</span><span>${fps || 0} fps ${cam.delegate}</span>`
     : `<span>No hands in view. Hold them up, palms to the camera.</span><span>${fps || 0} fps ${cam.delegate}</span>`;
 };
+
+// ---------------- theremin ----------------
+const theremin = createThereminPanel($("#thereminView"), { audio, getKey: effKey, getSettings: () => settings });
+function thereminFrame(hands, fps) {
+  const roles = assignHands(hands, { swap: settings.swapHands, oneHanded: false }); // swap-hands exchanges pitch and volume hands
+  const r = thereminFromHands(roles, { snap: settings.thereminSnap, key: effKey() });
+  theremin.setCamera(r);
+  const marks = { left: 0, right: 0 };
+  const labels = {};
+  if (roles.right) labels.right = { text: "Pitch" };
+  if (roles.left) labels.left = { text: "Volume " + Math.round(r.volume * 100) + "%" };
+  drawOverlay($("#overlay"), roles, labels, marks);
+  liveEl.innerHTML = hands.length
+    ? `<span>Pitch hand: ${roles.right ? "yes" : "none"}</span><span>Volume hand: ${roles.left ? "yes" : "none"}</span><span>${fps || 0} fps ${cam.delegate}</span>`
+    : `<span>No hands in view. Hold them up, palms to the camera.</span><span>${fps || 0} fps ${cam.delegate}</span>`;
+}
+function setInstrument(i) {
+  instrument = i;
+  document.body.dataset.instrument = i;
+  $$("#instrumentSeg [data-instrument]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.instrument === i)));
+  if (i === "theremin" && mode !== "play") { setMode("play"); return; }
+  syncInstrumentView();
+}
+function syncInstrumentView() {
+  const th = thereminNow();
+  $("#thereminView").hidden = !th;
+  $("#stageView").hidden = mode === "songs" || th;
+  theremin.setActive(th);
+  if (th) { performer.stopAll(); theremin.refreshKey(); announce("Theremin. Right hand height is pitch, left hand height is volume."); }
+  else showChord(performer.info);
+}
+$$("#instrumentSeg [data-instrument]").forEach((b) => b.addEventListener("click", () => setInstrument(b.dataset.instrument)));
 
 // ---------------- recorder ----------------
 let playTimers = [];
@@ -345,6 +387,7 @@ const tutorial = createTutorialPanel($("#tutorialCard"), {
 });
 
 function setMode(m) {
+  if (m !== "play" && instrument === "theremin") { instrument = "chords"; document.body.dataset.instrument = "chords"; $$("#instrumentSeg [data-instrument]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.instrument === "chords"))); }
   if (m === mode && !(m === "songs" && songs.active)) { /* re-select: fall through to refresh */ }
   const prev = mode;
   if (prev === "songs") songs.hide();
@@ -356,11 +399,13 @@ function setMode(m) {
   $("#stageView").hidden = m === "songs";
   $("#songView").hidden = m !== "songs";
   $("#recorderCard").hidden = m !== "play";
+  syncInstrumentView();
   if (m === "songs") { drums.stop(); songs.show(); }
   else applyBeat();
   if (m === "learn") tutorial.start();
   performer.setHarmony(effHarmony());
   refreshKeyUI();
+  if (thereminNow()) theremin.refreshKey();
 }
 $$(".tabs [role=tab]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 $(".tabs").addEventListener("keydown", (e) => {

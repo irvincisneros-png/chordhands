@@ -16,7 +16,8 @@ export class Performer {
     this.hold = false;
     this.external = null; // a chord object played by song Listen mode / recorder playback
     this.prevBase = null;
-    this.info = { chord: null, voiced: null, silent: true, source: null };
+    this.gate = null; // optional (chord) => bool: chords it rejects are made but not sounded (Practice "only the right chord")
+    this.info = { chord: null, played: null, octave: 0, voiced: null, silent: true, source: null };
     this.listeners = new Set();
     this.sig = "";
     this.gestureEnabled = false;
@@ -47,6 +48,8 @@ export class Performer {
   }
   setGesture(g) { this.layers.gesture = g; this.recompute(); }
   setGestureEnabled(on) { this.gestureEnabled = on; if (!on) this.layers.gesture = null; this.recompute(); }
+  /** fn(chord) -> true if it may sound; null removes the gate. The chord is still reported as info.played. */
+  setGate(fn) { this.gate = fn || null; this.recompute(); }
   setExternal(chord) { this.external = chord; this.recompute(); }
   setFlipToggle(v) { this.flipToggle = v; this.recompute(); }
   setAlterToggle(v) { this.alterToggle = v; this.recompute(); }
@@ -113,22 +116,31 @@ export class Performer {
   recompute() {
     const r = this._resolve();
     const a = this.audio;
-    if (r.volume != null) a.setExpression(r.volume); else a.setExpression(1);
+    const played = r.chord || null;
+    const octave = r.octave || 0;
+    const blocked = !!(played && this.gate && !this.gate(played));
+    const chord = blocked ? null : played;
+    if (r.volume != null && !blocked) a.setExpression(r.volume); else a.setExpression(blocked ? 0 : 1);
     a.setFilter(r.filter ?? null);
-    const chord = r.chord;
     const sig = chord ? `${chord.symbol}|${chord.inversion}|${r.octave}|${r.src}` : "silent";
-    if (sig === this.sig) return;
+    const playedSig = played ? `${played.symbol}|${played.inversion}|${octave}` : "none";
+    const full = sig + "#" + playedSig;
+    if (full === this.fullSig && sig === this.sig) return;
+    this.fullSig = full;
+    const changed = sig !== this.sig;
     this.sig = sig;
-    if (!chord) {
-      a.release();
-      this.info = { chord: null, voiced: null, silent: true, source: r.src };
-    } else {
-      const classic = r.src !== "external" && isClassic(this.harmony) ? classicVoice(chord, this.key, { octaveShift: r.octave }) : null;
-      const voiced = classic || voiceChord(chord, this.prevBase, { inversion: chord.inversion, octaveShift: r.octave });
-      this.prevBase = voiced.base;
-      a.setChord(voiced);
-      this.info = { chord, voiced, silent: false, source: r.src };
-    }
+    if (changed) {
+      if (!chord) {
+        a.release();
+        this.info = { chord: null, played, octave, voiced: null, silent: true, source: r.src };
+      } else {
+        const classic = r.src !== "external" && isClassic(this.harmony) ? classicVoice(chord, this.key, { octaveShift: r.octave }) : null;
+        const voiced = classic || voiceChord(chord, this.prevBase, { inversion: chord.inversion, octaveShift: r.octave });
+        this.prevBase = voiced.base;
+        a.setChord(voiced);
+        this.info = { chord, played, octave, voiced, silent: false, source: r.src };
+      }
+    } else this.info = { ...this.info, played, octave };
     for (const fn of this.listeners) fn(this.info);
   }
 }

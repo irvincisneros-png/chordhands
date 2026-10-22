@@ -22,6 +22,10 @@
     <button role="tab" data-mode="songs" aria-selected="false">Songs</button>
     <button role="tab" data-mode="learn" aria-selected="false">Learn</button>
   </nav>
+  <div class="seg instrument" id="instrumentSeg" role="radiogroup" aria-label="Instrument">
+    <button role="radio" data-instrument="chords" aria-checked="true">Chords</button>
+    <button role="radio" data-instrument="theremin" aria-checked="false" title="Right hand height = pitch, left hand height = volume">Theremin</button>
+  </div>
   <div class="top-actions">
     <button id="btnCamera" class="btn primary" aria-pressed="false">Start camera</button>
     <button id="btnGuide" class="btn" aria-haspopup="dialog">Hand guide</button>
@@ -64,6 +68,32 @@
 
     <!-- SONGS -->
     <section id="songView" class="view" hidden aria-label="Song tutorials"></section>
+
+    <!-- THEREMIN -->
+    <section id="thereminView" class="view" hidden aria-label="Theremin">
+      <div class="card theremin">
+        <div class="th-grid">
+          <div class="th-readout off" id="thReadout" aria-live="off">
+            <div class="th-label">Note</div>
+            <div class="th-note" id="thNote">–</div>
+            <div class="th-cents" id="thCents"></div>
+            <div class="th-hz" id="thHz"></div>
+            <div class="th-vol"><span>Volume</span><div class="th-volbar"><i id="thVol"></i></div><output id="thVolOut">0%</output></div>
+            <p class="th-hint" id="thHint" role="status"></p>
+            <div class="th-opts">
+              <label class="check"><input type="checkbox" data-setting="thereminSnap"> Snap to key</label>
+              <label>Voice <select data-setting="thereminVoice"><option value="sine">Sine</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option></select></label>
+            </div>
+          </div>
+          <div class="th-ruler" id="thRuler" role="img" aria-label="Pitch ruler: the notes of the current key from low (bottom) to high (top)"><div class="th-marker" id="thMarker" hidden></div></div>
+          <div class="th-pad" id="thPad" role="application" aria-label="Theremin pad: drag left to right for pitch, top to bottom for volume (top is loudest)">
+            <span class="th-pad-hint">Mouse / touch: drag here. Left to right = pitch, up = louder.</span>
+            <i class="th-dot" id="thDot" hidden></i>
+          </div>
+        </div>
+        <p class="sub">Camera: <b>right hand height = pitch</b>, <b>left hand height = volume</b>. Both hands must be in view. Swap hands in Settings if they are the wrong way round.</p>
+      </div>
+    </section>
 
     <!-- PAD -->
     <section class="card padcard" id="pad" aria-label="Chord pad">
@@ -131,7 +161,11 @@
       <details open><summary>Hands</summary>
         <label>Mode <select data-setting="handsMode"><option value="two">Two hands</option><option value="one">One hand (left only, root-position triads)</option></select></label>
         <label class="check"><input type="checkbox" data-setting="swapHands"> Swap hands (if chords follow the wrong hand)</label>
+        <label>Volume follows <select data-setting="volumeFrom"><option value="wrist">Wrist (default)</option><option value="index">Pointer fingertip</option></select></label>
         <label class="check"><input type="checkbox" data-setting="rightLenient"> Beginner help: keep sounding if the right hand drops out</label>
+      </details>
+      <details open><summary>Songs</summary>
+        <label class="check"><input type="checkbox" data-setting="practiceOnlyRight"> Practice: only the right chord sounds</label>
       </details>
       <details open><summary>Beat</summary>
         <label class="check"><input type="checkbox" data-setting="beatOn"> Drum loop</label>

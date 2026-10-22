@@ -24,8 +24,8 @@ export const RULES = {
   tiltBand: 0.12, // wrist-offset (raw x) that counts as a full tilt
   raiseAboveY: 0.5, // lowest point of the chord hand above this line -> raise
   lowerFromY: 0.8, // lowest point of the chord hand at/below this line -> lower
-  volTop: 0.05, // index fingertip y at (or above) this is full volume
-  volBottom: 0.95, // index fingertip y at (or below) this is silent
+  volTop: 0.05, // volume landmark y at (or above) this is full volume
+  volBottom: 0.95, // volume landmark y at (or below) this is silent
   filter: { neutralHz: 1200, neutralQ: 0.7, darkHz: 250, brightHz: 5000, darkQAdd: 1.5, brightQAdd: 4.5 },
   oneHandVolume: 0.5, // fixed level when the colour hand is not used
   lenientHoldMs: 550, // only for the optional "beginner help" setting
@@ -68,11 +68,22 @@ export function heightBand(lm) {
   for (const p of lm) if (p.y > maxY) maxY = p.y;
   return maxY < RULES.raiseAboveY ? 1 : maxY >= RULES.lowerFromY ? -1 : 0;
 }
-/** Right index fingertip (landmark 8) height -> volume 0..1 (higher = louder, linear). Folded or not, the tip y is used. */
-export function fingertipVolume(lm) {
+/** Height (raw frame y, 0 = top) -> volume 0..1, linear: y <= volTop full, y >= volBottom silent. */
+export function volumeFromY(y) {
   const { volTop, volBottom } = RULES;
-  return 1 - (clamp(lm[LM.INDEX_TIP].y, volTop, volBottom) - volTop) / (volBottom - volTop);
+  return 1 - (clamp(y, volTop, volBottom) - volTop) / (volBottom - volTop);
 }
+/** The two landmarks the right-hand volume can follow (setting "Volume follows"). */
+export const VOLUME_SOURCES = { wrist: LM.WRIST, index: LM.INDEX_TIP };
+export const DEFAULT_VOLUME_SOURCE = "wrist";
+/** Landmark index for a source name; anything unknown falls back to the wrist (the default). */
+export function volumeLandmark(source) { return VOLUME_SOURCES[source] ?? LM.WRIST; }
+/** Wrist (landmark 0) height -> volume 0..1 (higher = louder, linear). The default. */
+export function wristVolume(lm) { return volumeFromY(lm[LM.WRIST].y); }
+/** Index fingertip (landmark 8) height -> volume 0..1. A folded index still uses its tip y. */
+export function fingertipVolume(lm) { return volumeFromY(lm[LM.INDEX_TIP].y); }
+/** Volume for the chosen source: "wrist" (default) or "index". */
+export function handVolume(lm, source = DEFAULT_VOLUME_SOURCE) { return volumeFromY(lm[volumeLandmark(source)].y); }
 /** Right-hand tilt (inward positive) -> filter cutoff and resonance. */
 export function filterFor(tilt) {
   const F = RULES.filter;
@@ -209,7 +220,7 @@ const parseKey = (k) => {
 /** Maps chord-hand / colour-hand landmarks over time to a performance intent. */
 export class GestureTracker {
   constructor(opts = {}) {
-    this.opts = { oneHanded: false, lenientRight: false, raiseOn: false, lowerOn: false, aspect: 4 / 3, ...opts };
+    this.opts = { volumeFrom: DEFAULT_VOLUME_SOURCE, oneHanded: false, lenientRight: false, raiseOn: false, lowerOn: false, aspect: 4 / 3, ...opts };
     this.deb = new Debouncer();
     this.reset();
   }
@@ -245,7 +256,7 @@ export class GestureTracker {
     } else if (R) {
       const c = classifyRight(R);
       colour = c.colour; octaveDown = c.octaveDown;
-      volume = fingertipVolume(hands.right.lm);
+      volume = handVolume(hands.right.lm, o.volumeFrom);
       filter = this.lastFilter = filterFor(R.tilt);
       this.lastRightSeen = t; this.lastColour = colour; this.lastOctave = octaveDown; this.lastVolume = volume;
       strum = R.pinch && !this.pinchPrev;

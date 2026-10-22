@@ -1,6 +1,6 @@
 // Song picker + chord lane + Practice / Play-along / Listen modes. Chord progressions only, no lyrics.
 import { SONGS, isLab } from "../songs.js";
-import { buildTimeline, easyKey, SongRunner, Scorer, PracticeStepper } from "../songmode.js";
+import { buildTimeline, easyKey, SongRunner, Scorer, PracticeStepper, practiceMatch, colourOf } from "../songmode.js";
 import { gestureFor, pretty, makeKey, MAJOR_ROOTS, MINOR_ROOTS, parseKey } from "../theory.js";
 import { shapeForDegree } from "../gestures.js";
 import { handIcon } from "./hands.js";
@@ -97,6 +97,7 @@ export function createSongPanel(root, deps) {
           <label class="check"><input type="checkbox" id="svBeat"> Backing beat</label>
         </div>
         <div class="now" id="svNow" aria-live="polite"></div>
+        <div class="pchips" id="svChips" hidden></div>
         <div class="lane" id="lane" aria-label="Chord progression"><div class="playhead"></div><div class="track" id="track"></div><div class="countin" id="countin" hidden></div></div>
         <p class="tip"><b>Tip:</b> ${esc(s.tip)}</p>
         <div class="sv-live" id="svLive" aria-live="polite"></div>
@@ -178,13 +179,16 @@ export function createSongPanel(root, deps) {
     const loop = loopSec ? { start: loopSec.start, end: loopSec.end } : null;
     S.running = true;
     root.querySelector("#svGo").textContent = "Stop";
-    root.querySelectorAll(".cc").forEach((c) => c.classList.remove("ok", "late", "miss", "past", "current"));
+    root.querySelectorAll(".cc").forEach((c) => c.classList.remove("ok", "late", "miss", "skip", "past", "current"));
     const evs = loop ? S.tl.events.filter((e) => e.start >= loop.start - 1e-9 && e.start < loop.end - 1e-9) : S.tl.events;
     S.lastIdx = -2; S.shown = -1;
     if (S.mode === "practice") {
-      S.stepper = new PracticeStepper(evs);
+      S.stepper = new PracticeStepper(evs, { harmony: getSettings().harmony });
       S.runner = null;
       S.counting = false;
+      S.chipSig = "";
+      if (getSettings().practiceOnlyRight) performer.setGate((chord) => !S.stepper || S.stepper.done || practiceMatch(chord, S.stepper.target.chord, { harmony: getSettings().harmony }).ok);
+      renderChips();
     } else {
       const sp = S.speed / 100;
       S.runner = new SongRunner(S.tl, { bpm: S.song.bpm, speed: sp, countIn: S.song.beatsPerChord, loop });
@@ -196,7 +200,7 @@ export function createSongPanel(root, deps) {
       drums.beatsPerBar = S.song.beatsPerChord;
       drums.pattern = getSettings().beatPattern;
       drums.start(t0, { drums: S.beat, metronome: true });
-      S.scorer = S.mode === "play" ? new Scorer(evs) : null;
+      S.scorer = S.mode === "play" ? new Scorer(evs, { harmony: getSettings().harmony }) : null;
     }
     S.evs = evs;
     S.timer = setInterval(tick, 25);
@@ -208,8 +212,9 @@ export function createSongPanel(root, deps) {
     if (!S.running) return;
     const now = performance.now();
     if (S.mode === "practice") {
-      const r = S.stepper.update(now, performer.info.chord);
-      if (r.advanced) setCards(0, S.stepper.index < S.evs.length ? S.evs[S.stepper.index].index : 999);
+      const r = S.stepper.update(now, performer.info.played);
+      if (r.advanced) afterStep();
+      else updateChips();
       if (S.stepper.done) finish();
       return;
     }
@@ -230,6 +235,68 @@ export function createSongPanel(root, deps) {
       if (le && le !== S.lastShown) { S.lastShown = le; const c = root.querySelector(`.cc[data-i="${le.index}"]`); if (c) { c.classList.remove("ok", "late", "miss"); c.classList.add(le.rating); } liveText(le.rating); }
     }
     if (st.done) finish();
+  }
+  // ---------------- practice chips ----------------
+  const CHIP_ORDER = ["chord", "majmin", "colour", "octave"];
+  const COLOUR_NAME = { triad: "triad", inv1: "1st inv", seventh: "7th", dom7: "dom7" };
+  function targetColourText(t) {
+    if (t.sev == null) return "triad";
+    return t.ext === "dom7" || t.ext === "dim7" ? "dom7" : "7th";
+  }
+  function renderChips() {
+    const el = root.querySelector("#svChips");
+    if (!el) return;
+    el.hidden = false;
+    el.innerHTML = `<span class="pchip" data-k="chord"><b>Chord</b><i></i></span><span class="pchip" data-k="majmin"><b>Maj/Min</b><i></i></span><span class="pchip" data-k="colour"><b>Colour</b><i></i></span><span class="pchip" data-k="octave"><b>Octave</b><i></i></span>
+      <button class="btn small" id="svSkip" title="Give up on this chord and move on (counts as a skip)">Skip chord</button>`;
+    el.querySelector("#svSkip").addEventListener("click", () => {
+      if (!S.running || S.mode !== "practice" || S.stepper.done) return;
+      S.stepper.skip(performance.now());
+      afterStep();
+      if (S.stepper.done) finish();
+    });
+    S.chipSig = "";
+    updateChips();
+  }
+  /** Four live chips from the performer state: green = matches the target, red = does not, grey = nothing played / not needed. */
+  function updateChips() {
+    const el = root.querySelector("#svChips");
+    if (!el || !S.stepper || S.stepper.done) return;
+    const t = S.stepper.target.chord;
+    const info = performer.info;
+    const m = practiceMatch(info.played, t, { harmony: getSettings().harmony, octave: info.octave });
+    const cur = info.played;
+    const mark = (v) => (v === true ? "ok" : v === false ? "bad" : "idle");
+    const state = m.has ? { chord: mark(m.chord), majmin: mark(m.majmin), colour: m.colourNeeded ? mark(m.colour) : "idle", octave: m.octave ? "ok" : "bad" } : { chord: "idle", majmin: "idle", colour: "idle", octave: "idle" };
+    const sus = t.ext === "sus2" || t.ext === "sus4";
+    const text = {
+      chord: `${pretty(t.roman.replace(/(maj7|7|sus4|sus2|add9|°7|ø7|°|\+)$/, ""))} · ${pretty(t.rootName)}`,
+      majmin: sus ? "any" : t.quality === "maj" || t.quality === "aug" ? "major" : "minor",
+      colour: t.ext === "add9" || sus ? "any" : targetColourText(t),
+      octave: "normal",
+    };
+    const sig = CHIP_ORDER.map((k) => state[k]).join("|") + "|" + CHIP_ORDER.map((k) => text[k]).join("|") + "|" + (cur ? colourOf(cur) : "-");
+    if (sig === S.chipSig) return;
+    S.chipSig = sig;
+    const icon = { ok: "✓", bad: "✗", idle: "" };
+    for (const k of CHIP_ORDER) {
+      const c = el.querySelector(`.pchip[data-k="${k}"]`);
+      if (!c) continue;
+      c.className = "pchip " + state[k];
+      c.querySelector("i").textContent = `${text[k]} ${icon[state[k]]}`.trim();
+      c.title = k === "colour" && cur && state[k] !== "idle" ? "You are playing: " + (COLOUR_NAME[colourOf(cur)] || "other") : "";
+    }
+  }
+  /** After the stepper moved on (matched or skipped): card marks, gate refresh, new chips. */
+  function afterStep() {
+    const st = S.stepper;
+    const k = st.results.length - 1;
+    const card = S.evs[k] && root.querySelector(`.cc[data-i="${S.evs[k].index}"]`);
+    if (card) card.classList.add(st.results[k] === "skipped" ? "skip" : "ok");
+    setCards(0, st.index < S.evs.length ? S.evs[st.index].index : 999);
+    S.chipSig = "";
+    if (performer.gate) performer.recompute();
+    updateChips();
   }
   function liveText(r) {
     const el = root.querySelector("#svLive");
@@ -272,6 +339,9 @@ export function createSongPanel(root, deps) {
     drums.stop();
     audio.setBpm(getSettings().bpm);
     performer.setExternal(null);
+    performer.setGate(null);
+    const chips = root.querySelector("#svChips");
+    if (chips) chips.hidden = true;
     const go = root.querySelector("#svGo");
     if (go) go.textContent = "Start";
     const cd = root.querySelector("#countin");
@@ -291,11 +361,11 @@ export function createSongPanel(root, deps) {
       const isBest = saveBest(S.song.id, { accuracy: res.accuracy, stars: res.stars, streak: res.bestStreak });
       showResults(res, false, isBest);
     } else if (mode === "practice") {
-      showResults(null, false);
+      showResults(null, false, false, S.stepper ? { matched: S.stepper.matched, skipped: S.stepper.skipped } : null);
     }
   }
 
-  function showResults(res, partial, isBest) {
+  function showResults(res, partial, isBest, practice) {
     const dlg = document.getElementById("results");
     if (!dlg) return;
     dlg.innerHTML = res
@@ -306,8 +376,10 @@ export function createSongPanel(root, deps) {
          <p>On time <b>${res.ok}</b> · Late <b>${res.late}</b> · Missed <b>${res.miss}</b> · Best streak <b>${res.bestStreak}</b></p>
          <div class="dlg-actions"><button class="btn primary" id="resAgain">Play again</button><button class="btn" id="resClose">Close</button></div>`
       : `<div class="dlg-head"><h2 id="resultsTitle">Practice complete</h2></div>
-         <div class="stars">★★★</div>
-         <p>You found every chord. Try <b>Play-along</b> next: it keeps time and scores you.</p>
+         <div class="stars">${stars(!practice || !practice.skipped ? 3 : practice.matched >= practice.skipped ? 2 : 1)}</div>
+         <p class="big-num">${practice ? practice.matched : 0}<span class="sub"> of ${practice ? practice.matched + practice.skipped : 0} matched</span></p>
+         <p>Matched <b>${practice ? practice.matched : 0}</b> · Skipped <b>${practice ? practice.skipped : 0}</b></p>
+         <p>${practice && practice.skipped ? "Practise the skipped chords again, then" : "You found every chord. Next,"} try <b>Play-along</b>: it keeps time and scores you.</p>
          <div class="dlg-actions"><button class="btn primary" id="resAgain">Practice again</button><button class="btn" id="resClose">Close</button></div>`;
     dlg.showModal();
     dlg.querySelector("#resClose").addEventListener("click", () => { dlg.close(); renderList(); if (S.song) renderSong(); });

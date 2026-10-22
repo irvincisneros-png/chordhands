@@ -108,8 +108,9 @@ test("practice stepper waits for the right chord", () => {
   p.update(1100, mk("V"));
   assert.equal(p.update(1400, mk("V")).done, true);
 });
-test("chordsMatch ignores extensions but not quality", () => {
-  assert.ok(chordsMatch(mk("V"), mk("V7")));
+test("chordsMatch: quality matters, and a 7th target needs its 7th", () => {
+  assert.ok(!chordsMatch(mk("V"), mk("V7")));
+  assert.ok(chordsMatch(mk("V7"), mk("V7")));
   assert.ok(!chordsMatch(mk("iv"), mk("IV")));
   assert.ok(!chordsMatch(null, mk("I")));
 });
