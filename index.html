@@ -69,6 +69,15 @@
         <span class="bd" id="bdTone">Tone –</span>
         <span class="bd" id="bdOct" hidden>−8ve</span>
       </div>
+      <button type="button" class="key-badge" id="keyBadge" aria-haspopup="dialog" aria-expanded="false" aria-controls="keyPop" aria-label="Key: C major. Change key"><span id="keyBadgeText">Key: C major</span><i aria-hidden="true">▾</i></button>
+      <div class="key-pop" id="keyPop" role="dialog" aria-label="Choose a key" hidden>
+        <div class="kp-mode" role="group" aria-label="Mode">
+          <button type="button" data-kmode="major" aria-pressed="true">Major</button>
+          <button type="button" data-kmode="minor" aria-pressed="false">Minor</button>
+        </div>
+        <div class="kp-grid" id="keyGrid" role="group" aria-label="Key"></div>
+      </div>
+      <div class="key-toast" id="keyToast" hidden></div>
       <div class="cam-status" id="camStatus" hidden></div>
       <div class="cam-live" id="camLive" hidden></div>
       <!-- theremin overlay -->
@@ -180,7 +189,7 @@
         <label class="check"><input type="checkbox" data-setting="metronome"> Metronome click</label>
         <label>Tempo <input type="range" data-setting="bpm" min="60" max="160" step="1"> <output data-out="bpm"></output></label>
       </details>
-      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R</kbd> right hand 1–4 fingers · <kbd>T Y</kbd> sus4 add9 · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
+      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R</kbd> right hand 1–4 fingers · <kbd>T Y</kbd> sus4 add9 · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>[</kbd><kbd>]</kbd> key down/up · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
     </section>
   </aside>
 </main>

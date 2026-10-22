@@ -7,3 +7,4 @@ import "./misc.test.mjs";
 import "./classic.test.mjs";
 import "./theremin.test.mjs";
 import "./practice.test.mjs";
+import "./keypicker.test.mjs";

@@ -32,7 +32,7 @@ Default **Classic** controls (same hand mapping as the app that inspired this on
   down; raise your right hand (wrist) higher for louder (Settings: *Volume follows* wrist or pointer fingertip); tilt = filter. No right hand = silence (two-handed mode).
 - **Theremin** (header switch): right wrist height = pitch, left wrist height = volume, optional Snap to key; drag the
   pad without a camera.
-- Keyboard: 1-7 chords, Shift minor, Q W E R = right hand 1-4 fingers, Z/X octave.
+- Keyboard: 1-7 chords, Shift minor, Q W E R = right hand 1-4 fingers, Z/X octave, [ / ] key down/up a semitone (wraps; off while a song sets the key). The key badge on the stage opens a 12-key picker.
 - Optional: Diatonic harmony, one-handed mode, pinch-strum (Strum/Arp styles). A live gesture guide beside the camera
   shows what the camera reads. See the in-app **Hand guide**.
 

@@ -1,4 +1,5 @@
 // ChordHands: wires audio, input, camera and UI together.
+import { stepKeyRoot, keyLabel, GRID_LABELS, gridMove } from "./keypicker.js";
 import { keyFromPc, keyChords, makeKey, MAJOR_ROOTS, MINOR_ROOTS, pretty } from "./theory.js";
 import { AudioEngine, PRESET_LIST, STYLE_LIST } from "./audio.js";
 import { Drums, PATTERN_LIST } from "./drums.js";
@@ -76,7 +77,19 @@ function refreshKeyUI() {
   gestureGuide.setNames(chords.map((c) => pretty(c.symbol)));
   if (typeof theremin !== "undefined" && thereminNow()) theremin.refreshKey();
   $("#padKey").textContent = "· " + pretty(key.name.replace(/m$/, "")) + (key.mode === "minor" ? " minor" : " major");
+  refreshKeyBadge();
   $("#keyLine").innerHTML = chords.map((c, i) => `<span data-d="${i + 1}" style="--c:var(--deg${i + 1})">${pretty(c.symbol)}</span>`).join("");
+}
+function refreshKeyBadge() {
+  const key = effKey(), locked = !!keyOverride;
+  const txt = "Key: " + keyLabel(key.root, key.mode);
+  const b = $("#keyBadge");
+  $("#keyBadgeText").textContent = locked ? txt.replace("Key:", "Song key:") : txt;
+  b.classList.toggle("locked", locked);
+  b.setAttribute("aria-disabled", String(locked));
+  b.setAttribute("aria-label", locked ? `${txt}. Set by the song. Change it in the song's Key control.` : `${txt}. Change key`);
+  b.title = locked ? "Set by the song. Change it in the song's Key control." : "Change key";
+  if (locked) closeKeyPop(false);
 }
 function showChord(info) {
   const c = info.chord;
@@ -462,3 +475,72 @@ $("#songView").hidden = true;
 document.body.dataset.cam = "off";
 syncViews();
 $("#tutorialCard").hidden = true;
+
+// ---------------- key picker (stage badge, popover, [ ] shortcuts) ----------------
+function setKeyFromPicker(pc, m = settings.mode) {
+  // same code path as the Settings selects: set the control, fire its change handler
+  const modeEl = $('[data-setting="mode"]'), keyEl = $("#selKey");
+  if (m !== settings.mode) { modeEl.value = m; modeEl.dispatchEvent(new Event("change")); }
+  keyEl.value = String(pc); keyEl.dispatchEvent(new Event("change"));
+}
+let toastT = 0;
+function keyToast(msg) {
+  const t = $("#keyToast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 1400);
+  announce(msg);
+}
+const keyPop = $("#keyPop"), keyBadge = $("#keyBadge");
+function renderKeyGrid() {
+  const m = settings.mode;
+  $$("#keyPop [data-kmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.kmode === m)));
+  $("#keyGrid").innerHTML = GRID_LABELS[m].map((l, i) => `<button type="button" data-pc="${i}" aria-pressed="${i === settings.keyRoot}" aria-label="${l.replace("/", " or ")} ${m}" tabindex="${i === settings.keyRoot ? 0 : -1}">${l}</button>`).join("");
+}
+function openKeyPop() {
+  if (keyOverride) { keyToast("This key is set by the song. Change it in the song's Key control."); return; }
+  renderKeyGrid();
+  keyPop.hidden = false; keyBadge.setAttribute("aria-expanded", "true");
+  $(`#keyGrid [data-pc="${settings.keyRoot}"]`).focus();
+}
+function closeKeyPop(refocus = true) {
+  if (keyPop.hidden) return;
+  keyPop.hidden = true; keyBadge.setAttribute("aria-expanded", "false");
+  if (refocus) keyBadge.focus();
+}
+keyBadge.addEventListener("click", () => (keyPop.hidden ? openKeyPop() : closeKeyPop()));
+$("#keyGrid").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pc]"); if (!b) return;
+  setKeyFromPicker(+b.dataset.pc); closeKeyPop(); keyToast("Key: " + keyLabel(settings.keyRoot, settings.mode));
+});
+$$("#keyPop [data-kmode]").forEach((b) => b.addEventListener("click", () => {
+  setKeyFromPicker(settings.keyRoot, b.dataset.kmode); renderKeyGrid(); b.focus();
+  announce("Key: " + keyLabel(settings.keyRoot, settings.mode));
+}));
+keyPop.addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") { e.preventDefault(); closeKeyPop(); return; }
+  if (e.key === "Tab") { // keep focus inside the popover
+    const f = [...keyPop.querySelectorAll("button")].filter((x) => x.tabIndex >= 0);
+    const i = f.indexOf(document.activeElement);
+    e.preventDefault(); f[(i + (e.shiftKey ? f.length - 1 : 1)) % f.length].focus(); return;
+  }
+  const g = e.target.closest("#keyGrid [data-pc]");
+  if (g && /^(Arrow|Home$|End$)/.test(e.key)) {
+    e.preventDefault();
+    const n = gridMove(+g.dataset.pc, e.key);
+    $$("#keyGrid button").forEach((x) => (x.tabIndex = +x.dataset.pc === n ? 0 : -1));
+    $(`#keyGrid [data-pc="${n}"]`).focus();
+  }
+});
+document.addEventListener("pointerdown", (e) => { if (!keyPop.hidden && !keyPop.contains(e.target) && !keyBadge.contains(e.target)) closeKeyPop(false); }, true);
+window.addEventListener("keydown", (e) => {
+  if (e.key !== "[" && e.key !== "]") return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const t = e.target;
+  if (t.tagName === "TEXTAREA" || t.tagName === "SELECT" || (t.tagName === "INPUT" && t.type !== "checkbox" && t.type !== "range")) return;
+  if (t.closest && t.closest("dialog[open]")) return;
+  e.preventDefault();
+  if (keyOverride) { keyToast("Key is set by the song. Change it in the song's Key control."); return; }
+  setKeyFromPicker(stepKeyRoot(settings.keyRoot, e.key === "]" ? 1 : -1));
+  if (!keyPop.hidden) renderKeyGrid();
+  keyToast("Key: " + keyLabel(settings.keyRoot, settings.mode));
+});

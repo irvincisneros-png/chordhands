@@ -50,6 +50,6 @@ export function renderGuide(dlg, { volumeFrom = "wrist" } = {}) {
     <li>Tick <b>Snap to key</b> to land only on notes of the key. Without a camera, drag on the pad: left to right is pitch, up is louder.</li>
   </ul>
   <h3>Keyboard and touch</h3>
-  <p class="note"><kbd>1</kbd>–<kbd>7</kbd> chords, <kbd>Shift</kbd> minor (the tilt), <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> = right hand 1, 2, 3, 4 fingers (root, 1st inversion, 7th, dom7), <kbd>T</kbd> sus4 <kbd>Y</kbd> add9, <kbd>Z</kbd>/<kbd>X</kbd> octave (thumb), <kbd>,</kbd>/<kbd>.</kbd> inversion, <kbd>Space</kbd> strum, <kbd>P</kbd> projector. Or press and hold the big pad buttons.</p>`;
+  <p class="note"><kbd>1</kbd>–<kbd>7</kbd> chords, <kbd>Shift</kbd> minor (the tilt), <kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>R</kbd> = right hand 1, 2, 3, 4 fingers (root, 1st inversion, 7th, dom7), <kbd>T</kbd> sus4 <kbd>Y</kbd> add9, <kbd>Z</kbd>/<kbd>X</kbd> octave (thumb), <kbd>,</kbd>/<kbd>.</kbd> inversion, <kbd>Space</kbd> strum, <kbd>[</kbd>/<kbd>]</kbd> key down/up a semitone, <kbd>P</kbd> projector. Or press and hold the big pad buttons.</p>`;
   dlg.querySelector("#guideClose").addEventListener("click", () => dlg.close());
 }
