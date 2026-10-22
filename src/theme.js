@@ -27,6 +27,7 @@ export function initTheme(onChange) {
   if (mq) (mq.addEventListener ? mq.addEventListener("change", apply) : mq.addListener(apply));
   document.querySelectorAll("[data-theme-set]").forEach((b) => b.addEventListener("click", () => set(b.dataset.themeSet)));
   document.querySelectorAll("select[data-theme-select]").forEach((s) => s.addEventListener("change", () => set(s.value)));
+  window.addEventListener("storage", (e) => { if (e.key === KEY) { pref = loadTheme(); apply(); } });
   apply();
   return { set, get pref() { return pref; } };
 }
