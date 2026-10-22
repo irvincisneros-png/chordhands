@@ -32,7 +32,9 @@ Default **Classic** controls (same hand mapping as the app that inspired this on
   down; raise your right hand (wrist) higher for louder (Settings: *Volume follows* wrist or pointer fingertip); tilt = filter. No right hand = silence (two-handed mode).
 - **Theremin** (header switch): right wrist height = pitch, left wrist height = volume, optional Snap to key; drag the
   pad without a camera.
-- Keyboard: 1-7 chords, Shift minor, Q W E R = right hand 1-4 fingers, Z/X octave, [ / ] key down/up a semitone (wraps; off while a song sets the key). The key badge on the stage opens a 12-key picker.
+- Keyboard: 1-7 chords, Shift minor, Q W E R = right hand 1-4 fingers, Z/X octave, [ / ] key down/up a semitone (wraps; off while a song sets the key), ; / ' previous/next instrument. The key badge on the stage opens a 12-key picker; the instrument chip beside it opens a grouped instrument list.
+- **Instruments** (all procedural WebAudio, no samples): Synths (Warm Pad, Bright Synth, Retro Chip, Supersaw, Pluck, Acid, Synth Bass + Pad), Keys (Electric Piano, Lo-fi Keys, Organ, Music Box), Band & Orchestra (Strings, Horns, Nylon Guitar), Voices (Choir, Robo Singer). The right-hand tilt is the Tone filter; on Choir / Robo Singer it morphs the vowel oo-oh-ah-eh-ee, on Acid it drives the filter cutoff. Robo Singer sings a syllable (la / doo / na / mm / aah) on every chord change. Theremin has a Voice option (a sustained vowel). Synth Bass + Pad gives the bass note a fat saw/square + sub voice (Settings, Bass note, turns it off).
+- Dev check: open `tests/audio-check.html` (serve with `python3 -m http.server 8463`) to render every preset offline and compare levels.
 - Optional: Diatonic harmony, one-handed mode, pinch-strum (Strum/Arp styles). A live gesture guide beside the camera
   shows what the camera reads. See the in-app **Hand guide**.
 
@@ -62,4 +64,4 @@ Roman numerals: uppercase major, lowercase minor, `°` or `dim` diminished, suff
 ## Layout
 
 `index.html`, `styles.css`, `src/` (theory, gestures, camera, audio, drums, performer, songs, songmode, tutorial, recorder,
-storage, main, `ui/*`), `vendor/` (MediaPipe, Apache-2.0, see `vendor/mediapipe/LICENSE-NOTE.md`).
+storage, formants, main, `ui/*`), `vendor/` (MediaPipe, Apache-2.0, see `vendor/mediapipe/LICENSE-NOTE.md`).

@@ -69,7 +69,10 @@
         <span class="bd" id="bdTone">Tone –</span>
         <span class="bd" id="bdOct" hidden>−8ve</span>
       </div>
+      <div class="stage-chips">
       <button type="button" class="key-badge" id="keyBadge" aria-haspopup="dialog" aria-expanded="false" aria-controls="keyPop" aria-label="Key: C major. Change key"><span id="keyBadgeText">Key: C major</span><i aria-hidden="true">▾</i></button>
+      <button type="button" class="key-badge inst-badge" id="instBadge" aria-haspopup="dialog" aria-expanded="false" aria-controls="instPop" aria-label="Instrument: Warm Pad. Change instrument" title="Change instrument (; and ')"><span id="instBadgeText">Warm Pad</span><i aria-hidden="true">▾</i></button>
+      </div>
       <div class="key-pop" id="keyPop" role="dialog" aria-label="Choose a key" hidden>
         <div class="kp-mode" role="group" aria-label="Mode">
           <button type="button" data-kmode="major" aria-pressed="true">Major</button>
@@ -77,6 +80,7 @@
         </div>
         <div class="kp-grid" id="keyGrid" role="group" aria-label="Key"></div>
       </div>
+      <div class="key-pop inst-pop" id="instPop" role="dialog" aria-label="Choose an instrument" hidden></div>
       <div class="key-toast" id="keyToast" hidden></div>
       <div class="cam-status" id="camStatus" hidden></div>
       <div class="cam-live" id="camLive" hidden></div>
@@ -111,7 +115,8 @@
       </div>
       <div class="th-opts">
         <label class="check"><input type="checkbox" data-setting="thereminSnap"> Snap to key</label>
-        <label>Voice <select data-setting="thereminVoice"><option value="sine">Sine</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option></select></label>
+        <label>Voice <select data-setting="thereminVoice"><option value="sine">Sine</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option><option value="voice">Voice (Robo Singer)</option></select></label>
+        <label class="th-voice-only">Vowel <select data-setting="thereminVowel"><option value="follow">Follows left-hand tilt</option><option value="u">oo</option><option value="o">oh</option><option value="a">ah</option><option value="e">eh</option><option value="i">ee</option></select></label>
         <span class="sub">Camera: right hand height = pitch, left hand height = volume.</span>
       </div>
     </div>
@@ -160,6 +165,8 @@
     <section class="card settings" id="settings">
       <details open><summary>Sound</summary>
         <label>Instrument <select data-setting="preset"></select></label>
+        <label class="robo-only">Syllable <select data-setting="syllable"><option value="la">la</option><option value="doo">doo</option><option value="na">na</option><option value="mm">mm</option><option value="aah">aah</option></select></label>
+        <label class="robo-only">Pitch <select data-setting="roboTune"><option value="glide">Slight glide between chords</option><option value="snap">Auto-tune (instant snap)</option></select></label>
         <label>Style <select data-setting="style"></select></label>
         <label class="arp-only">Arpeggio <select data-setting="arpPattern"><option value="up">Up</option><option value="updown">Up and down</option><option value="random">Random</option></select></label>
         <label class="arp-only">Speed <select data-setting="arpDiv" data-number><option value="2">8th notes</option><option value="4">16th notes</option></select></label>
@@ -189,7 +196,7 @@
         <label class="check"><input type="checkbox" data-setting="metronome"> Metronome click</label>
         <label>Tempo <input type="range" data-setting="bpm" min="60" max="160" step="1"> <output data-out="bpm"></output></label>
       </details>
-      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R</kbd> right hand 1–4 fingers · <kbd>T Y</kbd> sus4 add9 · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>[</kbd><kbd>]</kbd> key down/up · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
+      <p class="keyhelp">Keys: <kbd>1</kbd>–<kbd>7</kbd> chords · <kbd>Shift</kbd> minor · <kbd>Q W E R</kbd> right hand 1–4 fingers · <kbd>T Y</kbd> sus4 add9 · <kbd>Z</kbd><kbd>X</kbd> octave · <kbd>,</kbd><kbd>.</kbd> inversion · <kbd>Space</kbd> strum · <kbd>[</kbd><kbd>]</kbd> key down/up · <kbd>;</kbd><kbd>'</kbd> previous/next instrument · <kbd>P</kbd> projector · <kbd>?</kbd> guide</p>
     </section>
   </aside>
 </main>

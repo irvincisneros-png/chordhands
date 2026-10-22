@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>ChordHands audio check (dev only)</title>
+<style>body{font:14px system-ui;margin:24px;background:#15111f;color:#eee}table{border-collapse:collapse}td,th{padding:4px 12px;border-bottom:1px solid #444;text-align:right}td:first-child,th:first-child{text-align:left}.bad{color:#ff6f91}.ok{color:#5ee6c4}</style>
+<h1>Audio check</h1>
+<p>Dev-only. Renders 1 s of every preset playing a C major chord through the real master chain (OfflineAudioContext) and checks for NaN, peak &le; 1.0 and RMS spread. RMS is measured from 0.2 s to 1.0 s (past the attack).</p>
+<pre id="summary">running...</pre>
+<table id="tbl"></table>
+<script type="module">
+import { AudioEngine, PRESET_LIST } from "../src/audio.js";
+const SR = 44100, SECONDS = 1, CHORD = { midi: [60, 64, 67, 72], bass: 48 };
+const db = (x) => 20 * Math.log10(Math.max(x, 1e-9));
+function stats(buf) {
+  let nan = 0, peak = 0, sum = 0, n = 0;
+  const from = Math.floor(0.2 * SR);
+  for (let c = 0; c < buf.numberOfChannels; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < d.length; i++) {
+      const x = d[i];
+      if (!Number.isFinite(x)) { nan++; continue; }
+      peak = Math.max(peak, Math.abs(x));
+      if (i >= from) { sum += x * x; n++; }
+    }
+  }
+  return { nan, peak, rms: Math.sqrt(sum / Math.max(1, n)) };
+}
+async function render(setup, raw = false) {
+  const ctx = new OfflineAudioContext(2, SR * SECONDS, SR);
+  const eng = new AudioEngine();
+  eng.ensure(ctx);
+  eng.setVolume(0.8);
+  if (raw) { eng.comp.ratio.value = 1; eng.limiter.ratio.value = 1; } // no compression: the level the voices really produce
+  setup(eng);
+  return stats(await ctx.startRendering());
+}
+const rows = [];
+for (const p of PRESET_LIST) {
+  const r = await render((eng) => { eng.setPreset(p.id); eng.setChord(CHORD); });
+  const w = await render((eng) => { eng.setPreset(p.id); eng.setChord(CHORD); }, true);
+  rows.push({ id: p.id, name: p.name, ...r, rawRms: w.rms });
+}
+// robo syllables and the singing theremin are checked too
+for (const syl of ["doo", "na", "mm", "aah"]) {
+  const r = await render((eng) => { eng.setPreset("robo"); eng.setSyllable(syl); eng.setChord(CHORD); });
+  rows.push({ id: "robo/" + syl, name: "Robo Singer (" + syl + ")", ...r, extra: true });
+}
+for (const type of ["sine", "voice"]) {
+  const r = await render((eng) => eng.thereminSet({ hz: 220, level: 0.4, on: true, tc: { pitch: 0.03, volume: 0.04 }, type }));
+  rows.push({ id: "theremin/" + type, name: "Theremin " + type, ...r, extra: true });
+}
+const main = rows.filter((r) => !r.extra);
+const rmsDb = main.map((r) => db(r.rms));
+const spread = Math.max(...rmsDb) - Math.min(...rmsDb);
+const rawDb = main.map((r) => db(r.rawRms));
+const rawSpread = Math.max(...rawDb) - Math.min(...rawDb);
+const tbl = document.getElementById("tbl");
+tbl.innerHTML = "<tr><th>preset</th><th>RMS dBFS</th><th>uncompressed RMS</th><th>peak</th><th>NaN</th></tr>" + rows.map((r) =>
+  `<tr><td>${r.name}</td><td>${db(r.rms).toFixed(1)}</td><td>${r.rawRms ? db(r.rawRms).toFixed(1) : ""}</td><td class="${r.peak > 1 ? "bad" : ""}">${r.peak.toFixed(3)}</td><td class="${r.nan ? "bad" : ""}">${r.nan}</td></tr>`).join("");
+const ok = main.every((r) => r.nan === 0 && r.peak <= 1) && rows.every((r) => r.nan === 0 && r.peak <= 1) && spread <= 6;
+document.getElementById("summary").innerHTML = `<b class="${ok ? "ok" : "bad"}">${ok ? "PASS" : "FAIL"}</b> RMS spread across presets: ${spread.toFixed(1)} dB (limit 6); uncompressed ${rawSpread.toFixed(1)} dB`;
+window.__audioCheck = { ok, spread, rawSpread, rows: rows.map((r) => ({ id: r.id, rmsDb: +db(r.rms).toFixed(1), raw: r.rawRms ? +db(r.rawRms).toFixed(1) : null, peak: +r.peak.toFixed(3), nan: r.nan })) };
+</script>

@@ -8,3 +8,4 @@ import "./classic.test.mjs";
 import "./theremin.test.mjs";
 import "./practice.test.mjs";
 import "./keypicker.test.mjs";
+import "./formants.test.mjs";

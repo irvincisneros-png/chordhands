@@ -1,10 +1,11 @@
 // ChordHands: wires audio, input, camera and UI together.
 import { stepKeyRoot, keyLabel, GRID_LABELS, gridMove } from "./keypicker.js";
 import { keyFromPc, keyChords, makeKey, MAJOR_ROOTS, MINOR_ROOTS, pretty } from "./theory.js";
-import { AudioEngine, PRESET_LIST, STYLE_LIST } from "./audio.js";
+import { AudioEngine, PRESET_LIST, PRESET_GROUPS, STYLE_LIST } from "./audio.js";
+import { vowelLabel, vowelPosFromFilter } from "./formants.js";
 import { Drums, PATTERN_LIST } from "./drums.js";
 import { Performer } from "./performer.js";
-import { GestureTracker, assignHands, volumeLandmark } from "./gestures.js";
+import { GestureTracker, assignHands, volumeLandmark, tiltAmount } from "./gestures.js";
 import { thereminFromHands } from "./theremin.js";
 import { createThereminPanel } from "./ui/thereminpanel.js";
 import { HandCamera, friendlyCameraError } from "./camera.js";
@@ -22,6 +23,7 @@ import { createGestureGuide } from "./ui/gestureguide.js";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const settings = loadSettings();
+if (!PRESET_LIST.some((p) => p.id === settings.preset)) settings.preset = "pad";
 const persist = () => saveSettings(settings);
 
 // ---------------- core objects ----------------
@@ -57,10 +59,12 @@ function applySettingsToAudio() {
   audio.setPreset(settings.preset); audio.style = settings.style;
   audio.arpPattern = settings.arpPattern; audio.arpDiv = settings.arpDiv; audio.bassOn = settings.bass;
   audio.setBpm(settings.bpm); audio.setVolume(settings.volume); audio.setReverb(settings.reverb);
+  audio.setSyllable(settings.syllable); audio.setRoboTune(settings.roboTune);
 }
 audio.preset = settings.preset; audio.style = settings.style; audio.arpPattern = settings.arpPattern;
 audio.arpDiv = settings.arpDiv; audio.bassOn = settings.bass; audio.bpm = settings.bpm;
 audio.volume = settings.volume; audio.reverbAmt = settings.reverb;
+audio.syllable = settings.syllable; audio.roboTune = settings.roboTune;
 
 // ---------------- display ----------------
 const piano = createPiano($("#piano"));
@@ -113,7 +117,8 @@ setInterval(() => { if (tutorial.active) tutorial.update(performance.now(), perf
 
 // ---------------- settings UI ----------------
 function fill(sel, list) { sel.innerHTML = list.map((o) => `<option value="${o.id}">${o.name}</option>`).join(""); }
-fill($('[data-setting="preset"]'), PRESET_LIST);
+const esc = (t) => t.replace(/&/g, "&amp;");
+$('[data-setting="preset"]').innerHTML = PRESET_GROUPS.map((g) => `<optgroup label="${esc(g.name)}">${g.presets.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join("")}</optgroup>`).join("");
 fill($('[data-setting="style"]'), STYLE_LIST);
 fill($('[data-setting="beatPattern"]'), PATTERN_LIST);
 function fillKeys() {
@@ -123,6 +128,19 @@ function fillKeys() {
 }
 fillKeys();
 function syncArpRows() { $$(".arp-only").forEach((l) => (l.hidden = settings.style !== "arp")); }
+function syncVoiceRows() {
+  $$(".robo-only").forEach((l) => (l.hidden = settings.preset !== "robo"));
+  $$(".th-voice-only").forEach((l) => (l.hidden = settings.thereminVoice !== "voice"));
+}
+function refreshToneBadge() {
+  if (camOn && !thereminNow()) return; // the camera loop writes it every frame
+  $("#bdTone").textContent = audio.toneMode === "vowel" ? "Vowel: " + vowelLabel(0.5) : "Tone –";
+}
+function refreshInstBadge() {
+  const p = PRESET_LIST.find((x) => x.id === settings.preset) || PRESET_LIST[0];
+  $("#instBadgeText").textContent = p.name;
+  instBadge.setAttribute("aria-label", `Instrument: ${p.name}. Change instrument`);
+}
 
 $$("[data-setting]").forEach((el) => {
   const name = el.dataset.setting;
@@ -140,7 +158,10 @@ $$("[data-setting]").forEach((el) => {
 });
 function applySetting(name, v) {
   switch (name) {
-    case "preset": audio.setPreset(v); break;
+    case "preset": audio.setPreset(v); refreshInstBadge(); syncVoiceRows(); refreshToneBadge(); break;
+    case "syllable": audio.setSyllable(v); break;
+    case "roboTune": audio.setRoboTune(v); break;
+    case "thereminVoice": syncVoiceRows(); break;
     case "style": audio.setStyle(v); syncArpRows(); break;
     case "arpPattern": audio.arpPattern = v; break;
     case "arpDiv": audio.arpDiv = v; break;
@@ -159,6 +180,7 @@ function applySetting(name, v) {
   }
 }
 syncArpRows();
+syncVoiceRows();
 
 function applyBeat() {
   drums.pattern = settings.beatPattern;
@@ -339,7 +361,7 @@ cam.onFrame = ({ hands, t, aspect, fps }) => {
   // badges: volume meter, tone brightness %, octave
   $("#bdVol").style.height = Math.round((one ? 0 : out.volume) * 100) + "%";
   const tonePct = Math.round((Math.log(out.filter.freq / 250) / Math.log(5000 / 250)) * 100);
-  $("#bdTone").textContent = one ? "Tone –" : "Tone " + tonePct + "%";
+  $("#bdTone").textContent = audio.toneMode === "vowel" ? "Vowel: " + vowelLabel(vowelPosFromFilter(out.filter)) : one ? "Tone –" : "Tone " + tonePct + "%";
   $("#bdOct").hidden = !(out.octaveDown && out.degree);
   const L = out.info.left, R = out.info.right;
   const labels = {};
@@ -358,6 +380,7 @@ const theremin = createThereminPanel($("#stageCol"), { audio, getKey: effKey, ge
 function thereminFrame(hands, fps) {
   const roles = assignHands(hands, { swap: settings.swapHands, oneHanded: false }); // swap-hands exchanges pitch and volume hands
   const r = thereminFromHands(roles, { snap: settings.thereminSnap, key: effKey() });
+  r.tilt = roles.left ? tiltAmount(roles.left.lm, roles.left.side) : 0; // left-hand tilt steers the sung vowel
   theremin.setCamera(r);
   const marks = { left: 0, right: 0 };
   const labels = {};
@@ -490,12 +513,66 @@ function keyToast(msg) {
   announce(msg);
 }
 const keyPop = $("#keyPop"), keyBadge = $("#keyBadge");
+// ---- instrument chip: grouped popover like the key picker, plus ; ' to step through instruments
+const instPop = $("#instPop"), instBadge = $("#instBadge");
+function renderInstPop() {
+  instPop.innerHTML = PRESET_GROUPS.map((g) => `<div class="ip-group" role="group" aria-label="${esc(g.name)}"><h4>${esc(g.name)}</h4><div class="ip-list">${g.presets.map((p) => `<button type="button" data-preset="${p.id}" aria-pressed="${p.id === settings.preset}">${esc(p.name)}</button>`).join("")}</div></div>`).join("");
+}
+function setPresetUI(id) {
+  const sel = $('[data-setting="preset"]');
+  sel.value = id; sel.dispatchEvent(new Event("change")); // same path as the Settings select (applies, saves, updates the chip)
+}
+function openInstPop() {
+  closeKeyPop(false);
+  renderInstPop();
+  instPop.hidden = false; instBadge.setAttribute("aria-expanded", "true");
+  $(`#instPop [data-preset="${settings.preset}"]`).focus();
+}
+function closeInstPop(refocus = true) {
+  if (instPop.hidden) return;
+  instPop.hidden = true; instBadge.setAttribute("aria-expanded", "false");
+  if (refocus) instBadge.focus();
+}
+instBadge.addEventListener("click", () => (instPop.hidden ? openInstPop() : closeInstPop()));
+instPop.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-preset]"); if (!b) return;
+  setPresetUI(b.dataset.preset); closeInstPop(); keyToast("Instrument: " + $("#instBadgeText").textContent);
+});
+instPop.addEventListener("keydown", (e) => {
+  e.stopPropagation();
+  if (e.key === "Escape") { e.preventDefault(); closeInstPop(); return; }
+  const bs = [...instPop.querySelectorAll("button")], i = bs.indexOf(document.activeElement);
+  if (e.key === "Tab") { e.preventDefault(); bs[(i + (e.shiftKey ? bs.length - 1 : 1)) % bs.length].focus(); return; }
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (step) { e.preventDefault(); bs[(i + step + bs.length) % bs.length].focus(); }
+  else if (e.key === "Home") { e.preventDefault(); bs[0].focus(); }
+  else if (e.key === "End") { e.preventDefault(); bs[bs.length - 1].focus(); }
+});
+document.addEventListener("pointerdown", (e) => { if (!instPop.hidden && !instPop.contains(e.target) && !instBadge.contains(e.target)) closeInstPop(false); }, true);
+window.addEventListener("keydown", (e) => {
+  if (e.key !== ";" && e.key !== "'") return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+  const t = e.target;
+  if (t.tagName === "TEXTAREA" || t.tagName === "SELECT" || (t.tagName === "INPUT" && t.type !== "checkbox" && t.type !== "range")) return;
+  if (t.closest && t.closest("dialog[open]")) return;
+  e.preventDefault();
+  if (thereminNow()) { keyToast("Theremin: pick its Voice below the pad."); return; }
+  const i = PRESET_LIST.findIndex((p) => p.id === settings.preset);
+  const n = PRESET_LIST[(i + (e.key === "'" ? 1 : -1) + PRESET_LIST.length) % PRESET_LIST.length];
+  setPresetUI(n.id);
+  if (!instPop.hidden) renderInstPop();
+  keyToast("Instrument: " + n.name);
+});
+refreshInstBadge();
+if (audio.toneMode === "vowel") $("#bdTone").textContent = "Vowel: " + vowelLabel(0.5);
+
 function renderKeyGrid() {
   const m = settings.mode;
   $$("#keyPop [data-kmode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.kmode === m)));
   $("#keyGrid").innerHTML = GRID_LABELS[m].map((l, i) => `<button type="button" data-pc="${i}" aria-pressed="${i === settings.keyRoot}" aria-label="${l.replace("/", " or ")} ${m}" tabindex="${i === settings.keyRoot ? 0 : -1}">${l}</button>`).join("");
 }
 function openKeyPop() {
+  closeInstPop(false);
   if (keyOverride) { keyToast("This key is set by the song. Change it in the song's Key control."); return; }
   renderKeyGrid();
   keyPop.hidden = false; keyBadge.setAttribute("aria-expanded", "true");

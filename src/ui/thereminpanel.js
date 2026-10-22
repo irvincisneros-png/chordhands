@@ -2,6 +2,7 @@
 // mouse / touch pad (pointer x = pitch, y = volume). Drives audio.thereminSet; camera readings come in via setCamera().
 import { THEREMIN, rulerTicks, thereminFromPad, unitFromHz, formatCents } from "../theremin.js";
 import { pretty } from "../theory.js";
+import { vowelPosFromTilt, vowelPosOf } from "../formants.js";
 
 export function createThereminPanel(root, { audio, getKey, getSettings }) {
   const q = (s) => root.querySelector(s);
@@ -45,7 +46,9 @@ export function createThereminPanel(root, { audio, getKey, getSettings }) {
     if (!active) { audio.thereminStop(); return; }
     show(r);
     if (!r) { audio.thereminSet({ on: false, tc: { pitch: THEREMIN.pitchTc, volume: THEREMIN.volumeTc } }); return; }
-    audio.thereminSet({ hz: r.hz, level: r.volume * THEREMIN.gain, on: r.gate, tc: r.tc, type: getSettings().thereminVoice });
+    const s = getSettings();
+    const vowelPos = s.thereminVowel === "follow" ? vowelPosFromTilt(r.tilt || 0) : vowelPosOf(s.thereminVowel);
+    audio.thereminSet({ hz: r.hz, level: r.volume * THEREMIN.gain, on: r.gate, tc: r.tc, type: s.thereminVoice, vowelPos });
   }
 
   // ---- pointer pad

@@ -17,7 +17,7 @@ export function save(key, value) {
 export const DEFAULT_SETTINGS = {
   keyRoot: 0, mode: "major", harmony: "classic", preset: "pad", style: "hold", arpPattern: "up", arpDiv: 2,
   bpm: 100, swapHands: false, handsMode: "two", raiseOn: false, lowerOn: false, rightLenient: false, controlsV: 2,
-  volumeFrom: "wrist", thereminSnap: false, thereminVoice: "sine", practiceOnlyRight: false,
+  volumeFrom: "wrist", thereminSnap: false, thereminVoice: "sine", thereminVowel: "follow", syllable: "la", roboTune: "glide", practiceOnlyRight: false,
   reverb: 0.25, volume: 0.8, bass: true, beatOn: false, beatPattern: "pop", metronome: false, hold: false,
 };
 export function loadSettings() {
@@ -28,7 +28,10 @@ export function loadSettings() {
   if (s.harmony === "free") s.harmony = "classic";
   if (s.harmony !== "classic" && s.harmony !== "diatonic") s.harmony = "classic";
   if (s.volumeFrom !== "wrist" && s.volumeFrom !== "index") s.volumeFrom = "wrist";
-  if (!["sine", "triangle", "sawtooth"].includes(s.thereminVoice)) s.thereminVoice = "sine";
+  if (!["sine", "triangle", "sawtooth", "voice"].includes(s.thereminVoice)) s.thereminVoice = "sine";
+  if (!["follow", "u", "o", "a", "e", "i"].includes(s.thereminVowel)) s.thereminVowel = "follow";
+  if (!["la", "doo", "na", "mm", "aah"].includes(s.syllable)) s.syllable = "la";
+  if (s.roboTune !== "snap") s.roboTune = "glide";
   return s;
 }
 export function saveSettings(s) { return save("settings", s); }
