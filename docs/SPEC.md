@@ -127,6 +127,16 @@ red = no match. In Classic harmony minor needs the tilt and 7ths need the right-
 counts as a skip; the end screen shows matched vs skipped. Optional setting "Practice: only the right chord
 sounds" (default off).
 
+## Layout (camera-first)
+The mirrored video is the stage (largest 16:9 box that fits). Over it: big chord name + roman numeral (top centre),
+the live left-hand / right-hand guides on the left and right edges, volume meter and Tone % / -8ve badges, the
+lock-in rings. Under it a compact strip (key chords, staff, piano); the chord pad and recorder live in a collapsible
+"Pad & tools" drawer (open when the camera is off or denied). Settings is a slide-over from the header. Before the
+camera starts the stage shows a big "Start camera" button and a "Play without camera" link. Songs: NOW card and
+practice chips sit on the video, the chord lane is a band across its bottom. Theremin: note, pitch ruler and volume
+on the video, mouse / touch pad in the strip. Projector mode = the stage fullscreen. Fits 1366x768 without page
+scroll (drawer closed); iPad portrait stacks video then strip.
+
 ## Classroom extras
 - **Projector mode**: hides side panels, huge chord name + piano strip.
 - **Free-play recorder**: records the chord sequence + timing, play it back, export as text ("C | G | Am | F").

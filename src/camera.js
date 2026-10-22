@@ -35,7 +35,7 @@ export class HandCamera {
     if (!cameraSupported()) throw Object.assign(new Error("unsupported"), { name: "NotSupported" });
     this.video = video;
     onStatus("Asking for camera…");
-    this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false });
+    this.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 960 }, height: { ideal: 540 }, aspectRatio: { ideal: 16 / 9 }, facingMode: "user" }, audio: false });
     video.srcObject = this.stream;
     video.muted = true;
     video.playsInline = true;

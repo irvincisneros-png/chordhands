@@ -10,7 +10,11 @@ export function drawOverlay(canvas, roles, labels, marks) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, w, h);
   if (!roles) return;
-  const px = (p) => [(1 - p.x) * w, p.y * h];
+  // The video is object-fit: cover and mirrored: map a landmark to where it is drawn inside the box.
+  const vw = (v && v.videoWidth) || 0, vh = (v && v.videoHeight) || 0;
+  let dw = w, dh = h, ox = 0, oy = 0;
+  if (vw && vh) { const s = Math.max(w / vw, h / vh); dw = vw * s; dh = vh * s; ox = (w - dw) / 2; oy = (h - dh) / 2; }
+  const px = (p) => [ox + (1 - p.x) * dw, oy + p.y * dh];
   for (const role of ["left", "right"]) {
     const hand = roles[role];
     if (!hand) continue;

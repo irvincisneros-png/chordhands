@@ -40,6 +40,9 @@ We feed MediaPipe the raw (un-mirrored) frame and mirror only the display, so
 `src/gestures.js#assignHands` uses the labels as they come (Left = chord hand) and falls back to x-position if both hands get the same label.
 If chords follow the wrong hand on some device, tick **Swap hands** in Settings.
 
+The page is camera-first: the video is the stage, overlays carry the chord and gesture guides, the pad lives in the
+**Pad & tools** drawer and Settings is a slide-over.
+
 ## Add a song
 
 Edit `src/songs.js` and add an object to `SONGS` (chord progressions only, never lyrics):

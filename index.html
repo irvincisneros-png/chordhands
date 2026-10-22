@@ -30,73 +30,87 @@
     <button id="btnCamera" class="btn primary" aria-pressed="false">Start camera</button>
     <button id="btnGuide" class="btn" aria-haspopup="dialog">Hand guide</button>
     <button id="btnProjector" class="btn" aria-pressed="false" title="Projector mode (P)">Projector</button>
-    <button id="btnPanel" class="btn only-narrow" aria-expanded="false" aria-controls="side">Settings</button>
+    <button id="btnPanel" class="btn" aria-expanded="false" aria-controls="side">Settings</button>
   </div>
 </header>
 
 <div id="banner" class="banner" hidden role="status" aria-live="polite"><span id="bannerText"></span><button id="bannerClose" class="btn small" aria-label="Dismiss message">OK</button></div>
 <div id="audioHint" class="banner soft" role="status">Press any key or tap anywhere to turn on sound.</div>
 
-<main class="layout">
-  <section class="main-col">
-
-    <!-- PLAY + LEARN -->
-    <section id="stageView" class="view" aria-label="Chord display">
+<main class="layout" id="layout">
+  <section class="stage-col" id="stageCol">
       <div id="tutorialCard" class="card tutorial" hidden></div>
-      <div class="card stage">
-        <div class="stage-top">
-          <div class="chord-big" id="chordBig" aria-live="polite">
-            <div class="roman" id="chordRoman">–</div>
-            <div class="name" id="chordName">Ready</div>
-            <div class="notes" id="chordNotes">Make a shape, or press 1 – 7</div>
-          </div>
-          <div class="staff-wrap" id="staffWrap"><div id="staff"></div></div>
-        </div>
-        <div class="piano" id="piano"></div>
-        <div class="keyline" id="keyLine" aria-label="Chords in this key"></div>
-      </div>
-      <div class="card rec" id="recorderCard">
-        <div class="rec-row">
-          <strong>Free-play recorder</strong>
-          <button id="recStart" class="btn small">Record</button>
-          <button id="recPlay" class="btn small" disabled>Play back</button>
-          <button id="recCopy" class="btn small" disabled>Copy chords</button>
-          <output id="recText" class="rec-text">Record a chord sequence, then play it back or copy it as text.</output>
-        </div>
-      </div>
-    </section>
 
-    <!-- SONGS -->
+    <!-- songs: list (shown instead of the stage until a song is open) -->
     <section id="songView" class="view" hidden aria-label="Song tutorials"></section>
 
-    <!-- THEREMIN -->
-    <section id="thereminView" class="view" hidden aria-label="Theremin">
-      <div class="card theremin">
-        <div class="th-grid">
-          <div class="th-readout off" id="thReadout" aria-live="off">
-            <div class="th-label">Note</div>
-            <div class="th-note" id="thNote">–</div>
-            <div class="th-cents" id="thCents"></div>
-            <div class="th-hz" id="thHz"></div>
-            <div class="th-vol"><span>Volume</span><div class="th-volbar"><i id="thVol"></i></div><output id="thVolOut">0%</output></div>
-            <p class="th-hint" id="thHint" role="status"></p>
-            <div class="th-opts">
-              <label class="check"><input type="checkbox" data-setting="thereminSnap"> Snap to key</label>
-              <label>Voice <select data-setting="thereminVoice"><option value="sine">Sine</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option></select></label>
-            </div>
-          </div>
-          <div class="th-ruler" id="thRuler" role="img" aria-label="Pitch ruler: the notes of the current key from low (bottom) to high (top)"><div class="th-marker" id="thMarker" hidden></div></div>
-          <div class="th-pad" id="thPad" role="application" aria-label="Theremin pad: drag left to right for pitch, top to bottom for volume (top is loudest)">
-            <span class="th-pad-hint">Mouse / touch: drag here. Left to right = pitch, up = louder.</span>
-            <i class="th-dot" id="thDot" hidden></i>
-          </div>
+    <!-- camera-first stage -->
+    <div class="stage-box" id="stageBox">
+    <div class="stage" id="stage">
+      <div class="cam-box" id="camBox">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="cam-empty" id="camEmpty">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1.5l4-2.5v12l-4-2.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="currentColor"/></svg>
+          <button id="btnCameraBig" class="btn primary big">Start camera</button>
+          <p class="privacy">Your video never leaves this device. Hand tracking runs locally in your browser.</p>
+          <button id="btnNoCamera" class="linklike">Play without camera</button>
         </div>
-        <p class="sub">Camera: <b>right hand height = pitch</b>, <b>left hand height = volume</b>. Both hands must be in view. Swap hands in Settings if they are the wrong way round.</p>
       </div>
-    </section>
+      <!-- overlays on the video -->
+      <div class="ov ov-chord chord-big" id="chordBig" aria-live="polite">
+        <div class="roman" id="chordRoman">–</div>
+        <div class="name" id="chordName">Ready</div>
+        <div class="notes" id="chordNotes">Make a shape, or press 1 – 7</div>
+      </div>
+      <div class="gesture-guide ov-guide" id="gestureGuide" aria-label="What the camera sees"></div>
+      <div class="ov ov-badges" id="badges" aria-hidden="true">
+        <div class="bd-vol"><i id="bdVol"></i></div>
+        <span class="bd" id="bdTone">Tone –</span>
+        <span class="bd" id="bdOct" hidden>−8ve</span>
+      </div>
+      <div class="cam-status" id="camStatus" hidden></div>
+      <div class="cam-live" id="camLive" hidden></div>
+      <!-- theremin overlay -->
+      <div class="ov th-over" id="thOverlay" hidden>
+        <div class="th-readout off" id="thReadout" aria-live="off">
+          <div class="th-note" id="thNote">–</div>
+          <div class="th-cents" id="thCents"></div>
+          <div class="th-hz" id="thHz"></div>
+        </div>
+        <div class="th-ruler" id="thRuler" role="img" aria-label="Pitch ruler: the notes of the current key from low (bottom) to high (top)"><div class="th-marker" id="thMarker" hidden></div></div>
+        <div class="th-vol"><span>Volume</span><div class="th-volbar"><i id="thVol"></i></div><output id="thVolOut">0%</output></div>
+        <p class="th-hint" id="thHint" role="status"></p>
+      </div>
+      <!-- songs overlay (NOW card, chips, chord lane band) -->
+      <div class="ov song-over" id="songOverlay" hidden></div>
+    </div>
+    </div>
 
-    <!-- PAD -->
-    <section class="card padcard" id="pad" aria-label="Chord pad">
+    <!-- compact strip under the stage -->
+    <div class="strip" id="strip">
+      <div class="strip-chords">
+        <div class="staff-wrap" id="staffWrap"><div id="staff"></div></div>
+        <div class="piano" id="piano"></div>
+      </div>
+      <div class="keyline" id="keyLine" aria-label="Chords in this key"></div>
+    </div>
+    <div class="strip th-strip" id="thStrip" hidden>
+      <div class="th-pad" id="thPad" role="application" aria-label="Theremin pad: drag left to right for pitch, top to bottom for volume (top is loudest)">
+        <span class="th-pad-hint">Mouse / touch: drag here. Left to right = pitch, up = louder.</span>
+        <i class="th-dot" id="thDot" hidden></i>
+      </div>
+      <div class="th-opts">
+        <label class="check"><input type="checkbox" data-setting="thereminSnap"> Snap to key</label>
+        <label>Voice <select data-setting="thereminVoice"><option value="sine">Sine</option><option value="triangle">Triangle</option><option value="sawtooth">Saw</option></select></label>
+        <span class="sub">Camera: right hand height = pitch, left hand height = volume.</span>
+      </div>
+    </div>
+
+    <!-- Pad & tools drawer: open when the camera is off or denied -->
+    <details class="drawer" id="drawer" open>
+      <summary>Pad &amp; tools</summary>
+    <section class="padcard" id="pad" aria-label="Chord pad">
       <div class="pad-head">
         <h2>Chord pad <span class="sub" id="padKey"></span></h2>
         <div class="pad-tools" role="group" aria-label="Chord colour and modifiers">
@@ -119,28 +133,21 @@
       </div>
       <div class="pad-grid" id="padGrid" role="group" aria-label="Seven chords of the key"></div>
     </section>
+      <div class="rec" id="recorderCard">
+        <div class="rec-row">
+          <strong>Free-play recorder</strong>
+          <button id="recStart" class="btn small">Record</button>
+          <button id="recPlay" class="btn small" disabled>Play back</button>
+          <button id="recCopy" class="btn small" disabled>Copy chords</button>
+          <output id="recText" class="rec-text">Record a chord sequence, then play it back or copy it as text.</output>
+        </div>
+      </div>
+    </details>
   </section>
 
-  <aside class="side-col" id="side" aria-label="Camera and settings">
-    <section class="card camcard" id="camCard">
-     <div class="cam-wrap">
-      <div class="cam-col">
-      <div class="cam-box" id="camBox">
-        <video id="video" playsinline muted></video>
-        <canvas id="overlay"></canvas>
-        <div class="cam-empty" id="camEmpty">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1.5l4-2.5v12l-4-2.5V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" fill="currentColor"/></svg>
-          <p>Camera is off.<br>Play with the pad, keys 1–7, or touch.</p>
-        </div>
-        <div class="cam-status" id="camStatus" hidden></div>
-        <div class="cam-live" id="camLive" hidden></div>
-      </div>
-      </div>
-      <div class="gesture-guide" id="gestureGuide" aria-label="What the camera sees"></div>
-     </div>
-      <p class="privacy">Your video never leaves this device. Hand tracking runs locally in your browser.</p>
-    </section>
-
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="side-col" id="side" aria-label="Settings" aria-hidden="true">
+    <div class="side-head"><h2>Settings</h2><button class="btn small" id="btnSideClose" aria-label="Close settings">Close</button></div>
     <section class="card settings" id="settings">
       <details open><summary>Sound</summary>
         <label>Instrument <select data-setting="preset"></select></label>

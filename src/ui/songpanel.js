@@ -25,7 +25,9 @@ function hint(g) {
 }
 
 export function createSongPanel(root, deps) {
+  const overlay = deps.overlay || root; // NOW card, chips and the chord lane live over the camera stage
   const { performer, audio, drums, getSettings, setKeyOverride, announce } = deps;
+  const Q = { one: (sel) => root.querySelector(sel) || overlay.querySelector(sel), all: (sel) => [...root.querySelectorAll(sel), ...(overlay === root ? [] : overlay.querySelectorAll(sel))] };
   const S = {
     tab: "songs", diff: 0, song: null, key: null, keyChoice: "orig", mode: "practice", speed: 100, loop: -1, beat: false,
     tl: null, running: false, runner: null, scorer: null, stepper: null, raf: 0, timer: 0, counting: false, lastIdx: -2, finished: false, shown: -1,
@@ -33,6 +35,8 @@ export function createSongPanel(root, deps) {
 
   // ---------------- list ----------------
   function renderList() {
+    if (overlay !== root) { overlay.hidden = true; overlay.innerHTML = ""; }
+    root.classList.remove("in-song");
     const best = loadBest();
     const items = SONGS.filter((s) => (S.tab === "lab" ? isLab(s) : !isLab(s))).filter((s) => !S.diff || s.difficulty === S.diff);
     root.innerHTML = `
@@ -53,9 +57,9 @@ export function createSongPanel(root, deps) {
             </button>`).join("") || `<p class="sub">No songs here yet.</p>`}
         </div>
       </div>`;
-    root.querySelectorAll("[data-tab]").forEach((b) => b.addEventListener("click", () => { S.tab = b.dataset.tab; renderList(); }));
-    root.querySelectorAll("[data-diff]").forEach((b) => b.addEventListener("click", () => { S.diff = +b.dataset.diff; renderList(); }));
-    root.querySelectorAll(".song-card").forEach((b) => b.addEventListener("click", () => openSong(b.dataset.id)));
+    Q.all("[data-tab]").forEach((b) => b.addEventListener("click", () => { S.tab = b.dataset.tab; renderList(); }));
+    Q.all("[data-diff]").forEach((b) => b.addEventListener("click", () => { S.diff = +b.dataset.diff; renderList(); }));
+    Q.all(".song-card").forEach((b) => b.addEventListener("click", () => openSong(b.dataset.id)));
   }
 
   // ---------------- song view ----------------
@@ -70,9 +74,11 @@ export function createSongPanel(root, deps) {
     S.key = currentKey();
     setKeyOverride(S.key);
     renderSong();
+    if (deps.onView) deps.onView();
   }
   function renderSong() {
     const s = S.song;
+    root.classList.add("in-song");
     const orig = parseKey(s.originalKey);
     const names = orig.mode === "minor" ? MINOR_ROOTS : MAJOR_ROOTS;
     S.tl = buildTimeline(s, S.key);
@@ -96,41 +102,45 @@ export function createSongPanel(root, deps) {
           <label>Loop <select id="svLoop"><option value="-1">Whole song</option>${S.tl.sections.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join("")}</select></label>
           <label class="check"><input type="checkbox" id="svBeat"> Backing beat</label>
         </div>
+        <p class="tip"><b>Tip:</b> ${esc(s.tip)}</p>
+      </div>`;
+    overlay.hidden = false;
+    overlay.innerHTML = `
+      <div class="so-top">
         <div class="now" id="svNow" aria-live="polite"></div>
         <div class="pchips" id="svChips" hidden></div>
-        <div class="lane" id="lane" aria-label="Chord progression"><div class="playhead"></div><div class="track" id="track"></div><div class="countin" id="countin" hidden></div></div>
-        <p class="tip"><b>Tip:</b> ${esc(s.tip)}</p>
         <div class="sv-live" id="svLive" aria-live="polite"></div>
-      </div>`;
-    root.querySelector("#svKey").value = S.keyChoice;
-    root.querySelector("#svLoop").value = String(S.loop);
-    root.querySelector("#svBeat").checked = S.beat;
+      </div>
+      <div class="lane" id="lane" aria-label="Chord progression"><div class="playhead"></div><div class="track" id="track"></div><div class="countin" id="countin" hidden></div></div>`;
+    Q.one("#svKey").value = S.keyChoice;
+    Q.one("#svLoop").value = String(S.loop);
+    Q.one("#svBeat").checked = S.beat;
     renderTrack();
     updateNow(0);
-    root.querySelector("#svBack").addEventListener("click", () => { stop(); S.song = null; setKeyOverride(null); renderList(); });
-    root.querySelector("#svGo").addEventListener("click", () => (S.running ? stop(true) : start()));
-    root.querySelectorAll("[data-m]").forEach((b) => b.addEventListener("click", () => {
+    Q.one("#svBack").addEventListener("click", () => { stop(); S.song = null; setKeyOverride(null); renderList(); if (deps.onView) deps.onView(); });
+    Q.one("#svGo").addEventListener("click", () => (S.running ? stop(true) : start()));
+    Q.all("[data-m]").forEach((b) => b.addEventListener("click", () => {
       if (S.running) return;
       S.mode = b.dataset.m;
-      root.querySelectorAll("[data-m]").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
+      Q.all("[data-m]").forEach((x) => x.setAttribute("aria-checked", String(x === b)));
     }));
-    root.querySelector("#svKey").addEventListener("change", (e) => { if (S.running) stop(); S.keyChoice = e.target.value; S.key = currentKey(); setKeyOverride(S.key); renderSong(); });
-    root.querySelector("#svEasy").addEventListener("click", () => {
+    Q.one("#svKey").addEventListener("change", (e) => { if (S.running) stop(); S.keyChoice = e.target.value; S.key = currentKey(); setKeyOverride(S.key); renderSong(); });
+    Q.one("#svEasy").addEventListener("click", () => {
       if (S.running) stop();
       const k = easyKey(S.song);
       S.keyChoice = `${k.root}:${k.mode}`; S.key = makeKey(k.rootName, k.mode); setKeyOverride(S.key); renderSong();
     });
-    root.querySelector("#svSpeed").addEventListener("input", (e) => {
+    Q.one("#svSpeed").addEventListener("input", (e) => {
       S.speed = +e.target.value;
-      root.querySelector("#svSpeedOut").textContent = S.speed + "%";
+      Q.one("#svSpeedOut").textContent = S.speed + "%";
       if (S.runner) { S.runner.setSpeed(S.speed / 100, audio.now); drums.setBpm(S.song.bpm * S.speed / 100); audio.setBpm(S.song.bpm * S.speed / 100); }
     });
-    root.querySelector("#svLoop").addEventListener("change", (e) => { if (S.running) stop(); S.loop = +e.target.value; });
-    root.querySelector("#svBeat").addEventListener("change", (e) => { S.beat = e.target.checked; if (S.running && S.runner) drums.drumsOn = S.beat; });
+    Q.one("#svLoop").addEventListener("change", (e) => { if (S.running) stop(); S.loop = +e.target.value; });
+    Q.one("#svBeat").addEventListener("change", (e) => { S.beat = e.target.checked; if (S.running && S.runner) drums.drumsOn = S.beat; });
   }
 
   function renderTrack() {
-    const track = root.querySelector("#track");
+    const track = Q.one("#track");
     let html = "";
     let lastSection = -1;
     for (const e of S.tl.events) {
@@ -150,7 +160,7 @@ export function createSongPanel(root, deps) {
   }
 
   function updateNow(idx) {
-    const el = root.querySelector("#svNow");
+    const el = Q.one("#svNow");
     if (!el) return;
     const ev = S.tl.events;
     const cur = ev[Math.max(0, idx)], next = ev[Math.min(ev.length - 1, Math.max(0, idx) + 1)];
@@ -163,7 +173,7 @@ export function createSongPanel(root, deps) {
 
   // ---------------- run ----------------
   function setCards(beatOrIdx, byIdx) {
-    const track = root.querySelector("#track");
+    const track = Q.one("#track");
     if (!track) return;
     const cards = track.children;
     for (const c of cards) {
@@ -178,8 +188,8 @@ export function createSongPanel(root, deps) {
     const loopSec = S.loop >= 0 ? S.tl.sections[S.loop] : null;
     const loop = loopSec ? { start: loopSec.start, end: loopSec.end } : null;
     S.running = true;
-    root.querySelector("#svGo").textContent = "Stop";
-    root.querySelectorAll(".cc").forEach((c) => c.classList.remove("ok", "late", "miss", "skip", "past", "current"));
+    Q.one("#svGo").textContent = "Stop";
+    Q.all(".cc").forEach((c) => c.classList.remove("ok", "late", "miss", "skip", "past", "current"));
     const evs = loop ? S.tl.events.filter((e) => e.start >= loop.start - 1e-9 && e.start < loop.end - 1e-9) : S.tl.events;
     S.lastIdx = -2; S.shown = -1;
     if (S.mode === "practice") {
@@ -232,7 +242,7 @@ export function createSongPanel(root, deps) {
     } else {
       S.scorer.update(st.beat, st.pass, performer.info.chord);
       const le = S.scorer.lastRatingEvent;
-      if (le && le !== S.lastShown) { S.lastShown = le; const c = root.querySelector(`.cc[data-i="${le.index}"]`); if (c) { c.classList.remove("ok", "late", "miss"); c.classList.add(le.rating); } liveText(le.rating); }
+      if (le && le !== S.lastShown) { S.lastShown = le; const c = Q.one(`.cc[data-i="${le.index}"]`); if (c) { c.classList.remove("ok", "late", "miss"); c.classList.add(le.rating); } liveText(le.rating); }
     }
     if (st.done) finish();
   }
@@ -244,7 +254,7 @@ export function createSongPanel(root, deps) {
     return t.ext === "dom7" || t.ext === "dim7" ? "dom7" : "7th";
   }
   function renderChips() {
-    const el = root.querySelector("#svChips");
+    const el = Q.one("#svChips");
     if (!el) return;
     el.hidden = false;
     el.innerHTML = `<span class="pchip" data-k="chord"><b>Chord</b><i></i></span><span class="pchip" data-k="majmin"><b>Maj/Min</b><i></i></span><span class="pchip" data-k="colour"><b>Colour</b><i></i></span><span class="pchip" data-k="octave"><b>Octave</b><i></i></span>
@@ -260,7 +270,7 @@ export function createSongPanel(root, deps) {
   }
   /** Four live chips from the performer state: green = matches the target, red = does not, grey = nothing played / not needed. */
   function updateChips() {
-    const el = root.querySelector("#svChips");
+    const el = Q.one("#svChips");
     if (!el || !S.stepper || S.stepper.done) return;
     const t = S.stepper.target.chord;
     const info = performer.info;
@@ -291,7 +301,7 @@ export function createSongPanel(root, deps) {
   function afterStep() {
     const st = S.stepper;
     const k = st.results.length - 1;
-    const card = S.evs[k] && root.querySelector(`.cc[data-i="${S.evs[k].index}"]`);
+    const card = S.evs[k] && Q.one(`.cc[data-i="${S.evs[k].index}"]`);
     if (card) card.classList.add(st.results[k] === "skipped" ? "skip" : "ok");
     setCards(0, st.index < S.evs.length ? S.evs[st.index].index : 999);
     S.chipSig = "";
@@ -299,7 +309,7 @@ export function createSongPanel(root, deps) {
     updateChips();
   }
   function liveText(r) {
-    const el = root.querySelector("#svLive");
+    const el = Q.one("#svLive");
     if (!el) return;
     const sc = S.scorer;
     el.innerHTML = `<span class="fb ${r}">${r === "ok" ? "On time!" : r === "late" ? "A little late" : "Missed"}</span> Streak <b>${sc.streak}</b> · Best <b>${sc.bestStreak}</b>`;
@@ -307,8 +317,8 @@ export function createSongPanel(root, deps) {
 
   function frame() {
     if (!S.running) return;
-    const track = root.querySelector("#track");
-    const cd = root.querySelector("#countin");
+    const track = Q.one("#track");
+    const cd = Q.one("#countin");
     if (!track) return;
     let beat = 0, idx = 0;
     if (S.mode === "practice") {
@@ -340,11 +350,11 @@ export function createSongPanel(root, deps) {
     audio.setBpm(getSettings().bpm);
     performer.setExternal(null);
     performer.setGate(null);
-    const chips = root.querySelector("#svChips");
+    const chips = Q.one("#svChips");
     if (chips) chips.hidden = true;
-    const go = root.querySelector("#svGo");
+    const go = Q.one("#svGo");
     if (go) go.textContent = "Start";
-    const cd = root.querySelector("#countin");
+    const cd = Q.one("#countin");
     if (cd) cd.hidden = true;
     if (was && userStopped && S.mode === "play" && S.scorer && S.scorer.total > 0 && S.loop >= 0) showResults(S.scorer.result(), true);
   }
@@ -390,7 +400,7 @@ export function createSongPanel(root, deps) {
   renderList();
   return {
     show() { root.hidden = false; if (!S.song) renderList(); },
-    hide() { stop(); S.song = null; setKeyOverride(null); root.hidden = true; },
+    hide() { stop(); S.song = null; setKeyOverride(null); root.hidden = true; overlay.hidden = true; },
     stop,
     get active() { return !!S.song; },
   };

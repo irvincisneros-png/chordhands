@@ -237,16 +237,35 @@ window.addEventListener("blur", () => { keysDown.length = 0; performer.release("
 const guide = $("#guide");
 function openGuide() { if (!guide.open) { renderGuide(guide, { volumeFrom: settings.volumeFrom }); guide.showModal(); } }
 $("#btnGuide").addEventListener("click", openGuide);
+let nativeFs = false;
 function setProjector(on) {
   document.body.classList.toggle("projector", on);
+  // projector = the stage fullscreen (CSS covers the viewport; the Fullscreen API is a bonus where allowed)
+  try {
+    if (on && document.fullscreenEnabled && !document.fullscreenElement) document.documentElement.requestFullscreen().then(() => { nativeFs = true; }).catch(() => {});
+    else if (!on && document.fullscreenElement) { nativeFs = false; document.exitFullscreen().catch(() => {}); }
+  } catch {}
   $("#btnProjector").setAttribute("aria-pressed", String(on));
   announce(on ? "Projector mode on. Press P or Escape to exit." : "Projector mode off.");
 }
 $("#btnProjector").addEventListener("click", () => setProjector(!document.body.classList.contains("projector")));
-$("#btnPanel").addEventListener("click", (e) => {
-  const open = $("#side").classList.toggle("open");
-  e.currentTarget.setAttribute("aria-expanded", String(open));
-});
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && nativeFs && document.body.classList.contains("projector")) { nativeFs = false; setProjector(false); } });
+// settings: slide-over panel
+function setSide(open) {
+  $("#side").classList.toggle("open", open);
+  $("#side").setAttribute("aria-hidden", String(!open));
+  $("#scrim").hidden = !open;
+  $("#btnPanel").setAttribute("aria-expanded", String(open));
+  if (open) $("#btnSideClose").focus(); else if (document.activeElement && $("#side").contains(document.activeElement)) $("#btnPanel").focus();
+}
+$("#btnPanel").addEventListener("click", () => setSide(!$("#side").classList.contains("open")));
+$("#btnSideClose").addEventListener("click", () => setSide(false));
+$("#scrim").addEventListener("click", () => setSide(false));
+window.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#side").classList.contains("open")) { e.stopPropagation(); setSide(false); } }, true);
+// Pad & tools drawer: open when the camera is off or denied, closed once the camera runs
+const drawer = $("#drawer");
+const setDrawer = (open) => { drawer.open = open; };
+$("#btnNoCamera").addEventListener("click", () => { setDrawer(true); drawer.scrollIntoView({ behavior: "smooth", block: "nearest" }); $("#padGrid button")?.focus({ preventScroll: true }); });
 
 // ---------------- camera ----------------
 const video = $("#video");
@@ -262,7 +281,8 @@ async function startCamera() {
     await cam.start(video, camStatus);
     camOn = true;
     $("#camBox").classList.add("on");
-    $("#camBox").style.aspectRatio = `${video.videoWidth || 4} / ${video.videoHeight || 3}`;
+    document.body.dataset.cam = "on";
+    setDrawer(false);
     $("#camEmpty").hidden = true;
     btn.textContent = "Stop camera"; btn.setAttribute("aria-pressed", "true");
     performer.setGestureEnabled(true);
@@ -272,11 +292,14 @@ async function startCamera() {
     camStatus("");
     banner(friendlyCameraError(err));
     camOn = false;
+    setDrawer(true);
   } finally { btn.disabled = false; }
 }
 function stopCamera() {
   cam.stop(); camOn = false;
   $("#camBox").classList.remove("on");
+  document.body.dataset.cam = "off";
+  setDrawer(true);
   $("#camEmpty").hidden = false;
   liveEl.hidden = true; camStatus("");
   drawOverlay($("#overlay"), null);
@@ -286,6 +309,7 @@ function stopCamera() {
   tracker.reset(); gestureGuide.reset(); performer.setGesture(null);
 }
 $("#btnCamera").addEventListener("click", () => (camOn ? stopCamera() : startCamera()));
+$("#btnCameraBig").addEventListener("click", () => { if (!camOn) startCamera(); });
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
 const colourLabel = (q, minor) => ["", "root", "1st inv", minor ? "m7" : "maj7", minor ? "dim7" : "dom7"][q] || "";
 /** One-handed if the setting says so, or while a Learn step asks for the left hand only. */
@@ -299,6 +323,11 @@ cam.onFrame = ({ hands, t, aspect, fps }) => {
   performer.setGesture(out);
   if (out.strum && settings.style !== "hold") performer.strum(); // pinch-strum only in Strum / Arpeggio styles
   gestureGuide.update(out, { oneHanded: one });
+  // badges: volume meter, tone brightness %, octave
+  $("#bdVol").style.height = Math.round((one ? 0 : out.volume) * 100) + "%";
+  const tonePct = Math.round((Math.log(out.filter.freq / 250) / Math.log(5000 / 250)) * 100);
+  $("#bdTone").textContent = one ? "Tone –" : "Tone " + tonePct + "%";
+  $("#bdOct").hidden = !(out.octaveDown && out.degree);
   const L = out.info.left, R = out.info.right;
   const labels = {};
   if (L.present) labels.left = { text: L.degree === 0 ? "Chord: none" : "Chord " + ROMAN[L.degree - 1] + (L.minor ? " minor" : " major") + (L.band > 0 && settings.raiseOn ? " ♯" : L.band < 0 && settings.lowerOn ? " ♭" : ""), progress: out.progress.left };
@@ -312,7 +341,7 @@ cam.onFrame = ({ hands, t, aspect, fps }) => {
 };
 
 // ---------------- theremin ----------------
-const theremin = createThereminPanel($("#thereminView"), { audio, getKey: effKey, getSettings: () => settings });
+const theremin = createThereminPanel($("#stageCol"), { audio, getKey: effKey, getSettings: () => settings });
 function thereminFrame(hands, fps) {
   const roles = assignHands(hands, { swap: settings.swapHands, oneHanded: false }); // swap-hands exchanges pitch and volume hands
   const r = thereminFromHands(roles, { snap: settings.thereminSnap, key: effKey() });
@@ -326,6 +355,17 @@ function thereminFrame(hands, fps) {
     ? `<span>Pitch hand: ${roles.right ? "yes" : "none"}</span><span>Volume hand: ${roles.left ? "yes" : "none"}</span><span>${fps || 0} fps ${cam.delegate}</span>`
     : `<span>No hands in view. Hold them up, palms to the camera.</span><span>${fps || 0} fps ${cam.delegate}</span>`;
 }
+/** Which parts of the camera-first layout show: the song list replaces the stage; theremin swaps the overlays and strip. */
+function syncViews() {
+  const th = thereminNow();
+  const list = mode === "songs" && !songs.active;
+  document.body.dataset.songlist = list ? "1" : "0";
+  $("#stageBox").hidden = list;
+  $("#strip").hidden = list || th;
+  $("#thStrip").hidden = !th;
+  $("#thOverlay").hidden = !th;
+  $("#drawer").hidden = list;
+}
 function setInstrument(i) {
   instrument = i;
   document.body.dataset.instrument = i;
@@ -335,8 +375,7 @@ function setInstrument(i) {
 }
 function syncInstrumentView() {
   const th = thereminNow();
-  $("#thereminView").hidden = !th;
-  $("#stageView").hidden = mode === "songs" || th;
+  syncViews();
   theremin.setActive(th);
   if (th) { performer.stopAll(); theremin.refreshKey(); announce("Theremin. Right hand height is pitch, left hand height is volume."); }
   else showChord(performer.info);
@@ -379,7 +418,7 @@ function setKeyOverride(k) {
   refreshKeyUI();
   showChord(performer.info);
 }
-const songs = createSongPanel($("#songView"), { performer, audio, drums, getSettings: () => ({ ...settings, harmony: effHarmony() }), setKeyOverride, announce });
+const songs = createSongPanel($("#songView"), { overlay: $("#songOverlay"), onView: () => syncViews(), performer, audio, drums, getSettings: () => ({ ...settings, harmony: effHarmony() }), setKeyOverride, announce });
 const tutorial = createTutorialPanel($("#tutorialCard"), {
   onStart() { setKeyOverride(makeKey("C")); refreshKeyUI(); },
   onEnd() { setMode("play"); },
@@ -396,7 +435,6 @@ function setMode(m) {
   performer.stopAll();
   document.body.dataset.mode = m;
   $$(".tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
-  $("#stageView").hidden = m === "songs";
   $("#songView").hidden = m !== "songs";
   $("#recorderCard").hidden = m !== "play";
   syncInstrumentView();
@@ -420,6 +458,7 @@ $(".tabs").addEventListener("keydown", (e) => {
 refreshKeyUI();
 showChord(performer.info);
 syncChips();
-$("#stageView").hidden = false;
 $("#songView").hidden = true;
+document.body.dataset.cam = "off";
+syncViews();
 $("#tutorialCard").hidden = true;
