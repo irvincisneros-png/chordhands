@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS = {
   keyRoot: 0, mode: "major", harmony: "classic", preset: "pad", style: "hold", arpPattern: "up", arpDiv: 2,
   bpm: 100, swapHands: false, handsMode: "two", raiseOn: false, lowerOn: false, rightLenient: false, controlsV: 2,
   volumeFrom: "wrist", thereminSnap: false, thereminVoice: "sine", thereminVowel: "follow", syllable: "la", roboTune: "glide", practiceOnlyRight: false,
-  reverb: 0.25, volume: 0.8, bass: true, beatOn: false, beatPattern: "pop", metronome: false, hold: false,
+  showLyrics: true, reverb: 0.25, volume: 0.8, bass: true, beatOn: false, beatPattern: "pop", metronome: false, hold: false,
 };
 export function loadSettings() {
   const saved = load("settings", {}) || {};
@@ -42,3 +42,7 @@ export function saveBest(id, rec) {
   if (!prev || rec.accuracy > prev.accuracy) { all[id] = rec; save("best", all); return true; }
   return false;
 }
+
+// Teacher-supplied lyrics: {songId: pasted text}, kept only in this browser.
+export function loadLyrics() { const v = load("lyrics", {}); return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
+export function saveLyrics(map) { return save("lyrics", map); }

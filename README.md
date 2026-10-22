@@ -47,7 +47,7 @@ The page is camera-first: the video is the stage, overlays carry the chord and g
 
 ## Add a song
 
-Edit `src/songs.js` and add an object to `SONGS` (chord progressions only, never lyrics):
+Edit `src/songs.js` and add an object to `SONGS` (chord progressions only; lyrics are allowed only on public-domain songs with `lyricsSource: "Public domain"`):
 
 ```js
 { id: "my-song", title: "My Song", artist: "Someone", year: 2001, difficulty: 1,   // 1 easy .. 3 hard
@@ -65,3 +65,7 @@ Roman numerals: uppercase major, lowercase minor, `°` or `dim` diminished, suff
 
 `index.html`, `styles.css`, `src/` (theory, gestures, camera, audio, drums, performer, songs, songmode, tutorial, recorder,
 storage, formants, main, `ui/*`), `vendor/` (MediaPipe, Apache-2.0, see `vendor/mediapipe/LICENSE-NOTE.md`).
+
+## Themes and lyrics
+
+Header toggle (System / Light / Dark, also in Settings) sets `data-theme` before first paint; colours are CSS custom properties. In Song mode the Lyrics button lets a teacher paste lyrics (one line per bar, `|` splits a bar) and export/import them as .json; they are stored only in this browser. Pure helpers live in `src/lyrics.js`.

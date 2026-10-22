@@ -18,10 +18,12 @@ import { renderGuide } from "./ui/guide.js";
 import { drawOverlay } from "./ui/overlay.js";
 import { createSongPanel } from "./ui/songpanel.js";
 import { createTutorialPanel } from "./ui/tutorialpanel.js";
+import { initTheme } from "./theme.js";
 import { createGestureGuide } from "./ui/gestureguide.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+initTheme();
 const settings = loadSettings();
 if (!PRESET_LIST.some((p) => p.id === settings.preset)) settings.preset = "pad";
 const persist = () => saveSettings(settings);
@@ -158,6 +160,7 @@ $$("[data-setting]").forEach((el) => {
 });
 function applySetting(name, v) {
   switch (name) {
+    case "showLyrics": if (typeof songs !== "undefined") songs.setShowLyrics(v); break;
     case "preset": audio.setPreset(v); refreshInstBadge(); syncVoiceRows(); refreshToneBadge(); break;
     case "syllable": audio.setSyllable(v); break;
     case "roboTune": audio.setRoboTune(v); break;
@@ -454,7 +457,7 @@ function setKeyOverride(k) {
   refreshKeyUI();
   showChord(performer.info);
 }
-const songs = createSongPanel($("#songView"), { overlay: $("#songOverlay"), onView: () => syncViews(), performer, audio, drums, getSettings: () => ({ ...settings, harmony: effHarmony() }), setKeyOverride, announce });
+const songs = createSongPanel($("#songView"), { overlay: $("#songOverlay"), onShowLyrics: (v) => { settings.showLyrics = v; persist(); const c = $('[data-setting="showLyrics"]'); if (c) c.checked = v; }, onView: () => syncViews(), performer, audio, drums, getSettings: () => ({ ...settings, harmony: effHarmony() }), setKeyOverride, announce });
 const tutorial = createTutorialPanel($("#tutorialCard"), {
   onStart() { setKeyOverride(makeKey("C")); refreshKeyUI(); },
   onEnd() { setMode("play"); },

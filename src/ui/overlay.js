@@ -25,6 +25,8 @@ export function drawOverlay(canvas, roles, labels, marks) {
     ctx.lineCap = "round";
     ctx.beginPath();
     for (const [a, b] of BONES) { const [x1, y1] = px(hand.lm[a]); const [x2, y2] = px(hand.lm[b]); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
+    // dark halo under the bright skeleton: reads on any video, in light and dark themes alike
+    ctx.save(); ctx.strokeStyle = "rgba(10,8,18,.65)"; ctx.lineWidth = ctx.lineWidth + Math.max(2, w / 250); ctx.stroke(); ctx.restore();
     ctx.stroke();
     for (let i = 0; i < 21; i++) { const [x, y] = px(hand.lm[i]); ctx.beginPath(); ctx.arc(x, y, i % 4 === 0 && i ? w / 120 : w / 220, 0, 7); ctx.fill(); }
     if (marks && marks[role] != null) {

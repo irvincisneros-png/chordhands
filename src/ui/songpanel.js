@@ -1,10 +1,11 @@
-// Song picker + chord lane + Practice / Play-along / Listen modes. Chord progressions only, no lyrics.
+// Song picker + chord lane + Practice / Play-along / Listen modes. Lyrics: built-in only for public-domain songs; teachers can paste their own (stored in this browser).
 import { SONGS, isLab } from "../songs.js";
 import { buildTimeline, easyKey, SongRunner, Scorer, PracticeStepper, practiceMatch, colourOf } from "../songmode.js";
 import { gestureFor, pretty, makeKey, MAJOR_ROOTS, MINOR_ROOTS, parseKey } from "../theory.js";
 import { shapeForDegree } from "../gestures.js";
 import { handIcon } from "./hands.js";
-import { loadBest, saveBest } from "../storage.js";
+import { loadBest, saveBest, loadLyrics, saveLyrics } from "../storage.js";
+import { lyricsForSong, hasLyrics, lyricAtBar, nextLyric, barProgress, barAtBeat, previewPairs, exportPayload, validateImport } from "../lyrics.js";
 
 const PPB = 76; // pixels per beat in the lane
 const ANCHOR = 120; // playhead x inside the lane
@@ -30,7 +31,7 @@ export function createSongPanel(root, deps) {
   const Q = { one: (sel) => root.querySelector(sel) || overlay.querySelector(sel), all: (sel) => [...root.querySelectorAll(sel), ...(overlay === root ? [] : overlay.querySelectorAll(sel))] };
   const S = {
     tab: "songs", diff: 0, song: null, key: null, keyChoice: "orig", mode: "practice", speed: 100, loop: -1, beat: false,
-    tl: null, running: false, runner: null, scorer: null, stepper: null, raf: 0, timer: 0, counting: false, lastIdx: -2, finished: false, shown: -1,
+    lyrics: loadLyrics(), showLyrics: getSettings().showLyrics !== false, flat: null, lyrBar: -2, tl: null, running: false, runner: null, scorer: null, stepper: null, raf: 0, timer: 0, counting: false, lastIdx: -2, finished: false, shown: -1,
   };
 
   // ---------------- list ----------------
@@ -48,12 +49,12 @@ export function createSongPanel(root, deps) {
           </div>
           ${S.tab === "songs" ? `<div class="seg" role="group" aria-label="Difficulty">${["All", "Easy", "Medium", "Hard"].map((n, i) => `<button data-diff="${i}" aria-pressed="${S.diff === i}">${n}</button>`).join("")}</div>` : `<span class="sub">Classic progressions to learn by ear and by hand.</span>`}
         </div>
-        <p class="sub">Chord progressions only. Pick one, learn the shapes, then play along.</p>
+        <p class="sub">Pick one, learn the shapes, then play along. A ♪ means the song has lyrics (public-domain songs, or ones your teacher added).</p>
         <div class="song-grid">
           ${items.map((s) => `<button class="song-card" data-id="${s.id}">
               <span class="sc-title">${esc(s.title)}</span>
               <span class="sc-meta">${esc(s.artist)}${s.year ? " · " + s.year : ""}</span>
-              <span class="sc-row"><span class="pill">Key ${esc(s.originalKey)}</span><span class="pill d${s.difficulty}">${DIFF[s.difficulty]}</span><span class="sc-best" title="Best score">${best[s.id] ? stars(best[s.id].stars) + " " + best[s.id].accuracy + "%" : ""}</span></span>
+              <span class="sc-row"><span class="pill">Key ${esc(s.originalKey)}</span><span class="pill d${s.difficulty}">${DIFF[s.difficulty]}</span>${hasLyrics(s, S.lyrics) ? `<span class="pill lyr-badge" title="Has lyrics" aria-label="Has lyrics">♪</span>` : ""}<span class="sc-best" title="Best score">${best[s.id] ? stars(best[s.id].stars) + " " + best[s.id].accuracy + "%" : ""}</span></span>
             </button>`).join("") || `<p class="sub">No songs here yet.</p>`}
         </div>
       </div>`;
@@ -101,6 +102,8 @@ export function createSongPanel(root, deps) {
           <label class="tempo">Speed <input type="range" id="svSpeed" min="50" max="120" step="5" value="${S.speed}"><output id="svSpeedOut">${S.speed}%</output></label>
           <label>Loop <select id="svLoop"><option value="-1">Whole song</option>${S.tl.sections.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join("")}</select></label>
           <label class="check"><input type="checkbox" id="svBeat"> Backing beat</label>
+          <label class="check"><input type="checkbox" id="svLyrOn"> Show lyrics</label>
+          <button class="btn small" id="svLyrics" aria-haspopup="dialog">Lyrics</button>
         </div>
         <p class="tip"><b>Tip:</b> ${esc(s.tip)}</p>
       </div>`;
@@ -109,12 +112,15 @@ export function createSongPanel(root, deps) {
       <div class="so-top">
         <div class="now" id="svNow" aria-live="polite"></div>
         <div class="pchips" id="svChips" hidden></div>
+        <div class="lyr" id="svLyr" hidden aria-live="off"></div>
         <div class="sv-live" id="svLive" aria-live="polite"></div>
       </div>
       <div class="lane" id="lane" aria-label="Chord progression"><div class="playhead"></div><div class="track" id="track"></div><div class="countin" id="countin" hidden></div></div>`;
     Q.one("#svKey").value = S.keyChoice;
     Q.one("#svLoop").value = String(S.loop);
     Q.one("#svBeat").checked = S.beat;
+    Q.one("#svLyrOn").checked = S.showLyrics;
+    S.flat = lyricsForSong(S.song, S.lyrics); S.lyrBar = -2;
     renderTrack();
     updateNow(0);
     Q.one("#svBack").addEventListener("click", () => { stop(); S.song = null; setKeyOverride(null); renderList(); if (deps.onView) deps.onView(); });
@@ -137,6 +143,9 @@ export function createSongPanel(root, deps) {
     });
     Q.one("#svLoop").addEventListener("change", (e) => { if (S.running) stop(); S.loop = +e.target.value; });
     Q.one("#svBeat").addEventListener("change", (e) => { S.beat = e.target.checked; if (S.running && S.runner) drums.drumsOn = S.beat; });
+    Q.one("#svLyrOn").addEventListener("change", (e) => { S.showLyrics = e.target.checked; if (deps.onShowLyrics) deps.onShowLyrics(S.showLyrics); S.lyrBar = -2; updateLyrics(S.running ? S.curBeat : 0, S.running ? S.curIdx : 0); });
+    Q.one("#svLyrics").addEventListener("click", openLyricsEditor);
+    updateLyrics(0, 0);
   }
 
   function renderTrack() {
@@ -171,6 +180,98 @@ export function createSongPanel(root, deps) {
     el.innerHTML = card(cur, S.mode === "listen" ? "Playing" : "Now") + (next && next !== cur ? card(next, "Next") : "");
   }
 
+  // ---------------- lyrics ----------------
+  /** Current bar's lyric large (with a tempo-timed fill in Play-along / Listen), next line smaller and faded. */
+  function updateLyrics(beat, idx) {
+    const el = Q.one("#svLyr");
+    if (!el) return;
+    const on = S.showLyrics && S.flat && S.flat.some((x) => x.trim());
+    el.hidden = !on;
+    if (!on) return;
+    const bar = S.tl.events[Math.max(0, idx)].bar;
+    if (bar !== S.lyrBar) {
+      S.lyrBar = bar;
+      const cur = lyricAtBar(S.flat, bar), nxt = nextLyric(S.flat, bar);
+      el.innerHTML = `<div class="lyr-now ${cur ? "" : "empty"}"><span class="lyr-base">${esc(cur) || "&nbsp;"}</span><span class="lyr-fill" aria-hidden="true">${esc(cur)}</span></div><div class="lyr-next">${esc(nxt) || "&nbsp;"}</div>`;
+    }
+    const fill = el.querySelector(".lyr-fill");
+    const p = S.mode === "practice" ? 1 : barProgress(beat, S.tl.barLen);
+    if (fill) fill.style.clipPath = `inset(0 ${((1 - p) * 100).toFixed(1)}% 0 0)`;
+  }
+
+  let dlg = null;
+  function openLyricsEditor() {
+    const s = S.song;
+    if (!s) return;
+    if (!dlg) { dlg = document.createElement("dialog"); dlg.className = "guide lyr-dlg"; dlg.setAttribute("aria-labelledby", "lyrTitle"); document.body.appendChild(dlg); }
+    const hasBuiltIn = Array.isArray(s.lyrics);
+    dlg.innerHTML = `
+      <div class="dlg-head"><h2 id="lyrTitle">Lyrics: ${esc(s.title)}</h2><button class="btn small" id="lyClose">Close</button></div>
+      <p class="note">Paste lyrics you have permission to use (e.g. your school's licence). They are stored only in this browser.</p>
+      <p class="sub">One line per bar. Put <b>|</b> in a line to split it across two bars. A blank line means no lyric for that bar.${hasBuiltIn ? " This song has built-in public-domain lyrics; pasted lyrics replace them until you clear." : ""}</p>
+      <div class="lyr-edit">
+        <label class="lyr-ta"><span class="sr-only">Lyrics, one line per bar</span><textarea id="lyText" rows="12" spellcheck="false" placeholder="line one&#10;line two | line three&#10;&#10;line five"></textarea></label>
+        <div class="lyr-prev" id="lyPrev" aria-label="Preview: each bar's chord and lyric"></div>
+      </div>
+      <div class="dlg-actions lyr-actions">
+        <button class="btn primary" id="lySave">Save</button>
+        <button class="btn" id="lyClear">Clear</button>
+        <span class="sep"></span>
+        <button class="btn" id="lyExport">Export all (.json)</button>
+        <button class="btn" id="lyImport">Import (.json)</button>
+        <input type="file" id="lyFile" accept=".json,application/json" hidden>
+      </div>
+      <p class="sub" id="lyMsg" role="status" aria-live="polite"></p>`;
+    const $ = (q) => dlg.querySelector(q);
+    const ta = $("#lyText"), msg = (t) => { $("#lyMsg").textContent = t; };
+    ta.value = typeof S.lyrics[s.id] === "string" ? S.lyrics[s.id] : (S.flat && hasBuiltIn ? S.flat.join("\n") : "");
+    const drawPrev = () => {
+      $("#lyPrev").innerHTML = previewPairs(s, ta.value).map((r) => `<div class="lp-row${r.lyric ? "" : " none"}"><span class="lp-bar">${r.bar}</span><span class="lp-chord">${esc(r.chords)}</span><span class="lp-text">${esc(r.lyric) || "–"}</span></div>`).join("");
+    };
+    drawPrev();
+    ta.addEventListener("input", drawPrev);
+    const refresh = () => { S.flat = lyricsForSong(s, S.lyrics); S.lyrBar = -2; updateLyrics(S.running ? S.curBeat : 0, S.running ? S.curIdx : 0); };
+    $("#lySave").addEventListener("click", () => {
+      if (ta.value.trim()) S.lyrics[s.id] = ta.value; else delete S.lyrics[s.id];
+      const ok = saveLyrics(S.lyrics);
+      refresh();
+      msg(ok ? "Saved in this browser." : "Could not save to browser storage; lyrics will last until you close the page.");
+    });
+    $("#lyClear").addEventListener("click", () => {
+      delete S.lyrics[s.id]; saveLyrics(S.lyrics); ta.value = ""; drawPrev(); refresh(); msg("Cleared.");
+    });
+    $("#lyExport").addEventListener("click", () => {
+      const all = { ...S.lyrics }; if (ta.value.trim()) all[s.id] = ta.value;
+      const payload = exportPayload(all);
+      if (!Object.keys(payload.lyrics).length) { msg("Nothing to export yet."); return; }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "chordhands-lyrics.json";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      msg("Exported " + Object.keys(payload.lyrics).length + " song(s).");
+    });
+    $("#lyImport").addEventListener("click", () => $("#lyFile").click());
+    $("#lyFile").addEventListener("change", async (e) => {
+      const f = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      if (f.size > 2e6) { msg("That file is too large."); return; }
+      let text = "";
+      try { text = await f.text(); } catch { msg("Could not read that file."); return; }
+      const r = validateImport(text, SONGS.map((x) => x.id));
+      if (!r.ok) { msg(r.error); return; }
+      Object.assign(S.lyrics, r.lyrics);
+      saveLyrics(S.lyrics);
+      ta.value = typeof S.lyrics[s.id] === "string" ? S.lyrics[s.id] : ta.value;
+      drawPrev(); refresh();
+      msg("Imported lyrics for " + r.count + " song(s).");
+    });
+    $("#lyClose").addEventListener("click", () => dlg.close());
+    dlg.showModal();
+    ta.focus();
+  }
+
   // ---------------- run ----------------
   function setCards(beatOrIdx, byIdx) {
     const track = Q.one("#track");
@@ -184,6 +285,7 @@ export function createSongPanel(root, deps) {
   }
   async function start() {
     await audio.unlock();
+    S.lyrBar = -2;
     S.finished = false;
     const loopSec = S.loop >= 0 ? S.tl.sections[S.loop] : null;
     const loop = loopSec ? { start: loopSec.start, end: loopSec.end } : null;
@@ -338,7 +440,9 @@ export function createSongPanel(root, deps) {
       } else cd.hidden = true;
     }
     track.style.transform = `translateX(${ANCHOR - beat * PPB}px)`;
+    S.curBeat = beat; S.curIdx = idx;
     if (idx !== S.shown) { S.shown = idx; setCards(beat, idx); updateNow(idx); }
+    updateLyrics(beat, idx);
     S.raf = requestAnimationFrame(frame);
   }
 
@@ -400,6 +504,7 @@ export function createSongPanel(root, deps) {
   renderList();
   return {
     show() { root.hidden = false; if (!S.song) renderList(); },
+    setShowLyrics(v) { S.showLyrics = !!v; S.lyrBar = -2; const c = Q.one("#svLyrOn"); if (c) c.checked = S.showLyrics; if (S.song) updateLyrics(S.curBeat || 0, S.curIdx || 0); },
     hide() { stop(); S.song = null; setKeyOverride(null); root.hidden = true; overlay.hidden = true; },
     stop,
     get active() { return !!S.song; },

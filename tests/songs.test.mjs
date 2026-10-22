@@ -5,6 +5,7 @@ import { parseKey, parseRoman, makeKey, MAJOR_ROOTS, MINOR_ROOTS } from "../src/
 import { buildTimeline, SongRunner, Scorer, PracticeStepper, chordsMatch, easyKey } from "../src/songmode.js";
 
 const ALLOWED = ["id", "title", "artist", "year", "difficulty", "originalKey", "bpm", "beatsPerChord", "sections", "tip"];
+const PD = [...ALLOWED, "lyrics", "lyricsSource"];
 
 test("songs list: enough entries, unique ids, includes Progression Lab", () => {
   assert.ok(SONGS.length >= 3);
@@ -12,8 +13,12 @@ test("songs list: enough entries, unique ids, includes Progression Lab", () => {
   assert.ok(SONGS.some(isLab));
 });
 for (const s of SONGS) {
-  test(`song "${s.id}" is valid, parses in ${s.originalKey}, has no lyrics`, () => {
-    assert.deepEqual(Object.keys(s).sort(), [...ALLOWED].sort(), "only schema fields (no lyrics field)");
+  test(`song "${s.id}" is valid, parses in ${s.originalKey}, has no unexpected fields`, () => {
+    if (s.lyricsSource === "Public domain") {
+      assert.deepEqual(Object.keys(s).sort(), [...PD].sort(), "public-domain songs may add lyrics + lyricsSource");
+      assert.equal(s.lyrics.length, s.sections.length);
+      s.sections.forEach((sec, i) => { assert.equal(s.lyrics[i].length, sec.bars.length, "lyrics parallel to bars"); s.lyrics[i].forEach((l) => assert.equal(typeof l, "string")); });
+    } else assert.deepEqual(Object.keys(s).sort(), [...ALLOWED].sort(), "only schema fields (no lyrics field)");
     assert.ok([1, 2, 3].includes(s.difficulty));
     assert.ok(s.bpm >= 40 && s.bpm <= 220);
     assert.ok(s.beatsPerChord >= 2 && s.beatsPerChord <= 6);
@@ -113,4 +118,21 @@ test("chordsMatch: quality matters, and a 7th target needs its 7th", () => {
   assert.ok(chordsMatch(mk("V7"), mk("V7")));
   assert.ok(!chordsMatch(mk("iv"), mk("IV")));
   assert.ok(!chordsMatch(null, mk("I")));
+});
+
+test("only the three public-domain songs carry lyrics", () => {
+  const withLyrics = SONGS.filter((s) => "lyrics" in s || "lyricsSource" in s).map((s) => s.id).sort();
+  assert.deepEqual(withLyrics, ["happy-birthday", "ode-to-joy", "twinkle-twinkle"]);
+  for (const s of SONGS) if (s.lyrics) assert.equal(s.lyricsSource, "Public domain");
+});
+test("borrowed chords parse: major III and minor iv in a major key", () => {
+  const G = makeKey("G");
+  const iii = parseRoman("III", G), iv = parseRoman("iv", G), I = parseRoman("IV", G);
+  assert.equal(iii.rootName, "B"); assert.equal(iii.quality, "maj");
+  assert.equal(iv.rootName, "C"); assert.equal(iv.quality, "min");
+  assert.equal(I.quality, "maj");
+  assert.equal(parseRoman("iii", G).quality, "min");
+  const creep = SONGS.find((x) => x.id === "creep");
+  assert.deepEqual(creep.sections[0].bars.flat(), ["I", "III", "IV", "iv"]);
+  assert.deepEqual(buildTimeline(creep).events.map((e) => e.chord.symbol), ["G", "B", "C", "Cm"]);
 });
