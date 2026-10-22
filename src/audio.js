@@ -224,7 +224,7 @@ export class AudioEngine {
     this.reverbAmt = a;
     if (this.ctx) this.send.gain.setTargetAtTime(a, this.now, 0.05);
   }
-  /** Live expression 0..1 from hand height (a short ramp, about 50 ms). */
+  /** Live expression 0..1 from the right index fingertip height (a short ramp, about 50 ms). */
   setExpression(x) { if (this.ctx) this.expr.gain.setTargetAtTime(Math.max(0, x), this.now, 0.02); }
   /** Tone filter from the colour-hand tilt: {freq, q}, or null for fully open. Smoothed with a 40 ms time constant. */
   setFilter(f) {

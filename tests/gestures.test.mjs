@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzeHand, classifyLeft, classifyRight, assignHands, Debouncer, GestureTracker,
-  fingerUp, thumbOut, tiltAmount, heightBand, wristVolume, filterFor, RULES,
+  fingerUp, thumbOut, tiltAmount, heightBand, fingertipVolume, filterFor, RULES,
 } from "../src/gestures.js";
 
 // Synthetic upright hand in RAW frame coordinates (y down), wrist at (ox, oy), palm length about 0.2.
@@ -122,14 +122,21 @@ test("pitch bands only act when their toggle is on", () => {
   assert.equal(run({ raiseOn: true, lowerOn: true }, 0.65), 0);
 });
 
-test("right-hand height -> volume is linear from wrist y 0.05 (full) to 0.95 (silent)", () => {
-  const at = (y) => wristVolume(hand({ oy: y }));
+test("right-hand volume follows the index fingertip: linear from y 0.05 (full) to 0.95 (silent)", () => {
+  const withTip = (y, o = {}) => { const lm = hand({ fingers: [1, 0, 0, 0], side: "right", ...o }); lm[8] = { ...lm[8], y }; return lm; };
+  const at = (y) => fingertipVolume(withTip(y));
   assert.equal(at(0), 1);
   assert.equal(at(0.05), 1);
   assert.ok(Math.abs(at(0.5) - 0.5) < 1e-9);
   assert.equal(at(0.95), 0);
   assert.equal(at(1), 0);
-  assert.ok(at(0.2) > at(0.6));
+  assert.ok(at(0.2) > at(0.6), "high fingertip loud, low fingertip quiet (wrist fixed)");
+  assert.ok(fingertipVolume(withTip(0.1)) > fingertipVolume(withTip(0.8)));
+  // wrist moves, fingertip fixed: no change
+  assert.equal(fingertipVolume(withTip(0.4, { oy: 0.5 })), fingertipVolume(withTip(0.4, { oy: 0.9 })));
+  // folded index still uses its tip y
+  const folded = hand({ side: "right" }); folded[8] = { ...folded[8], y: 0.5 };
+  assert.ok(Math.abs(fingertipVolume(folded) - 0.5) < 1e-9);
 });
 test("right-hand tilt -> filter: 250 Hz..1200 Hz..5000 Hz, Q 2.2 .. 0.7 .. 5.2", () => {
   assert.deepEqual(filterFor(0), { freq: 1200, q: 0.7 });
@@ -232,7 +239,7 @@ test("every right-hand shape and the volume / filter come straight from the fram
   const tr = new GestureTracker({ aspect: 1 });
   const out = run(tr, 0, 300, { left: LH({ fingers: n4(1) }), right: RH({ fingers: n4(2), oy: 0.5, lean: 0.6 }) });
   assert.equal(out.colour, "inv1");
-  assert.ok(Math.abs(out.volume - wristVolume(RH({ oy: 0.5 }).lm)) < 1e-9);
+  assert.ok(Math.abs(out.volume - fingertipVolume(RH({ fingers: n4(2), oy: 0.5, lean: 0.6 }).lm)) < 1e-9);
   assert.ok(out.filter.freq > 1200, "inward tilt opens the filter");
 });
 test("hands missing, two-handed: no right hand = silence (immediate volume 0, mute after the hold)", () => {

@@ -44,7 +44,7 @@ export function createGestureGuide(el) {
         <span class="gg-chip" data-ftilt="in">Tilt in: brighter</span>
         <span class="gg-chip" data-ftilt="out">Tilt out: darker</span>
       </div>
-      <div class="gg-meter" aria-hidden="true"><span>Volume</span><div><i data-vol></i></div></div>
+      <div class="gg-meter" aria-hidden="true"><div><i data-vol></i></div><span>Volume: raise your right pointer finger higher for louder</span></div>
     </section>
     <p class="gg-note" data-note></p>`;
 
@@ -88,7 +88,7 @@ export function createGestureGuide(el) {
     setRing(leftRing, out ? out.progress.left : 0);
     setRing(rightRing, out ? out.progress.right : 0);
     const vol = q("[data-vol]");
-    vol.style.width = R ? Math.round(R.volume * 100) + "%" : "0%";
+    vol.style.height = R ? Math.round(R.volume * 100) + "%" : "0%";
   }
 
   return {

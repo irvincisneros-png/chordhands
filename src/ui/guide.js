@@ -38,7 +38,7 @@ export function renderGuide(dlg) {
   <ul class="note-list">
     <li><b>Fingers</b> (thumb not counted): 1 root position, 2 first inversion, 3 seventh (maj7 on a major chord, m7 on minor), 4 dominant 7 (dim7 on minor).</li>
     <li><b>Thumb in:</b> higher octave. <b>Thumb out:</b> one octave lower.</li>
-    <li><b>Hand height:</b> higher is louder, lower is softer. <b>Tilt inward:</b> brighter, more filter. <b>Tilt outward:</b> darker.</li>
+    <li><b>Volume:</b> raise your right pointer finger higher for louder, lower it for softer. <b>Tilt inward:</b> brighter, more filter. <b>Tilt outward:</b> darker.</li>
     <li><b>Hold a shape</b> for a split second; the ring in the panel fills while it locks in. Losing a hand for a blink does not interrupt the chord.</li>
     <li><b>One-handed mode</b> (Settings, Hands): only the left hand is read, the chord is a root-position triad. Use the pad chips or keys Q W E R for the right-hand shapes.</li>
     <li><b>Wrong hand?</b> Use <i>Swap hands</i> in Settings. <b>Pinch</b> thumb to index re-strikes the chord in the Strum and Arpeggio styles.</li>

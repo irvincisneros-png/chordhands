@@ -27,7 +27,7 @@ Conventions: landmarks are the raw camera frame, 0..1, **y grows downward**. The
 |---|---|
 | Quality | number of extended fingers (thumb **not** counted): 0 = silent, 1 = root position, 2 = 1st inversion, 3 = maj7 (major chord) or m7 (minor), 4 = dom7 (major) or dim7 with a b5 (minor). |
 | Octave | thumb out = every note one octave **lower**; thumb in = normal ("higher"). |
-| Volume | wrist y, linear: y <= 0.05 full, y >= 0.95 silent. Higher hand = louder. Gain ramps over 50 ms per frame; no other smoothing. |
+| Volume | right index fingertip y (landmark 8), linear in the raw frame: y <= 0.05 full, y >= 0.95 silent. Higher fingertip = louder. This is the convention used by this family of gesture-synth apps (earlier versions here used the wrist). A folded index still uses its tip y; zero fingers already means silent. Gain ramps over 50 ms per frame; no other smoothing. |
 | Filter | same tilt measure (inward positive). Neutral 1200 Hz, Q 0.7. Outward: cutoff 1200 - 950*t (down to 250 Hz), Q 0.7 + 1.5*t. Inward: cutoff 1200 + 3800*t (up to 5000 Hz), Q 0.7 + 4.5*t. Smoothed with a 40 ms time constant. |
 
 ## Timing, triggering, missing hands

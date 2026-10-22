@@ -56,7 +56,7 @@ Summary:
 | 2 | 1st inversion |
 | 3 | maj7 (major) or m7 (minor) |
 | 4 | dom7 (major) or dim7 with b5 (minor) |
-- Thumb out = one octave lower. Wrist height = volume (y 0.05 full .. 0.95 silent, linear). Tilt inward = brighter:
+- Thumb out = one octave lower. Volume = right index fingertip height (landmark 8; y 0.05 full .. 0.95 silent, linear; raise your right pointer finger higher for louder; a folded index still counts by its tip). Tilt inward = brighter:
   filter 1200 Hz neutral, up to 5 kHz / Q 5.2; outward darker, down to 250 Hz / Q 2.2.
 - Pinch (thumb tip to index tip) re-strikes the chord, **only in Strum / Arpeggio styles**.
 - Right hand missing in two-handed mode = silence. Optional "Beginner help" (off by default) keeps the last

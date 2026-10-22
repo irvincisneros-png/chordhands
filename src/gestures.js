@@ -8,7 +8,7 @@
 // "swap hands" setting if a device labels them the other way round). The label also picks which way the
 // thumb test points, because a left and a right hand extend their thumbs in opposite directions.
 
-export const LM = { WRIST: 0, THUMB_MCP: 2, THUMB_IP: 3, THUMB_TIP: 4, INDEX_MCP: 5, MIDDLE_MCP: 9, RING_MCP: 13, PINKY_MCP: 17 };
+export const LM = { WRIST: 0, THUMB_MCP: 2, THUMB_IP: 3, THUMB_TIP: 4, INDEX_MCP: 5, INDEX_TIP: 8, MIDDLE_MCP: 9, RING_MCP: 13, PINKY_MCP: 17 };
 const FINGERS = [
   { name: "index", pip: 6, tip: 8 },
   { name: "middle", pip: 10, tip: 12 },
@@ -24,8 +24,8 @@ export const RULES = {
   tiltBand: 0.12, // wrist-offset (raw x) that counts as a full tilt
   raiseAboveY: 0.5, // lowest point of the chord hand above this line -> raise
   lowerFromY: 0.8, // lowest point of the chord hand at/below this line -> lower
-  volTop: 0.05, // wrist y at (or above) this is full volume
-  volBottom: 0.95, // wrist y at (or below) this is silent
+  volTop: 0.05, // index fingertip y at (or above) this is full volume
+  volBottom: 0.95, // index fingertip y at (or below) this is silent
   filter: { neutralHz: 1200, neutralQ: 0.7, darkHz: 250, brightHz: 5000, darkQAdd: 1.5, brightQAdd: 4.5 },
   oneHandVolume: 0.5, // fixed level when the colour hand is not used
   lenientHoldMs: 550, // only for the optional "beginner help" setting
@@ -68,10 +68,10 @@ export function heightBand(lm) {
   for (const p of lm) if (p.y > maxY) maxY = p.y;
   return maxY < RULES.raiseAboveY ? 1 : maxY >= RULES.lowerFromY ? -1 : 0;
 }
-/** Right-hand wrist height -> volume 0..1 (higher = louder, linear). */
-export function wristVolume(lm) {
+/** Right index fingertip (landmark 8) height -> volume 0..1 (higher = louder, linear). Folded or not, the tip y is used. */
+export function fingertipVolume(lm) {
   const { volTop, volBottom } = RULES;
-  return 1 - (clamp(lm[LM.WRIST].y, volTop, volBottom) - volTop) / (volBottom - volTop);
+  return 1 - (clamp(lm[LM.INDEX_TIP].y, volTop, volBottom) - volTop) / (volBottom - volTop);
 }
 /** Right-hand tilt (inward positive) -> filter cutoff and resonance. */
 export function filterFor(tilt) {
@@ -245,7 +245,7 @@ export class GestureTracker {
     } else if (R) {
       const c = classifyRight(R);
       colour = c.colour; octaveDown = c.octaveDown;
-      volume = wristVolume(hands.right.lm);
+      volume = fingertipVolume(hands.right.lm);
       filter = this.lastFilter = filterFor(R.tilt);
       this.lastRightSeen = t; this.lastColour = colour; this.lastOctave = octaveDown; this.lastVolume = volume;
       strum = R.pinch && !this.pinchPrev;

@@ -29,7 +29,7 @@ Default **Classic** controls (same hand mapping as the app that inspired this on
 - Left hand = chord. Digits up (thumb counts) 1-5 = I-V, index+pinky = VI, +thumb = VII, no digit = silence.
   Tilt inward = major, outward = minor. Optional height bands raise/lower a semitone.
 - Right hand = chord shape. 1 finger root position, 2 first inversion, 3 maj7/m7, 4 dom7/dim7; thumb out = octave
-  down; height = volume; tilt = filter. No right hand = silence (two-handed mode).
+  down; raise your right pointer finger higher for louder; tilt = filter. No right hand = silence (two-handed mode).
 - Keyboard: 1-7 chords, Shift minor, Q W E R = right hand 1-4 fingers, Z/X octave.
 - Optional: Diatonic harmony, one-handed mode, pinch-strum (Strum/Arp styles). A live gesture guide beside the camera
   shows what the camera reads. See the in-app **Hand guide**.

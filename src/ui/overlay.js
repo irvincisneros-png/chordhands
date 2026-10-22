@@ -22,6 +22,11 @@ export function drawOverlay(canvas, roles, labels) {
     for (const [a, b] of BONES) { const [x1, y1] = px(hand.lm[a]); const [x2, y2] = px(hand.lm[b]); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); }
     ctx.stroke();
     for (let i = 0; i < 21; i++) { const [x, y] = px(hand.lm[i]); ctx.beginPath(); ctx.arc(x, y, i % 4 === 0 && i ? w / 120 : w / 220, 0, 7); ctx.fill(); }
+    if (role === "right") {
+      const [tx, ty] = px(hand.lm[8]);
+      ctx.lineWidth = Math.max(2, w / 200); ctx.strokeStyle = "#fff"; ctx.fillStyle = colour;
+      ctx.beginPath(); ctx.arc(tx, ty, w / 70, 0, 7); ctx.fill(); ctx.stroke();
+    }
     const [wx, wy] = px(hand.lm[0]);
     const lab = labels && labels[role];
     if (lab) {

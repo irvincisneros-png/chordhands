@@ -153,8 +153,8 @@ kbd { font: 600 0.7em var(--font); background: rgba(255,255,255,.1); border: 1px
 .gg-chip.on { background: var(--good); color: #0a2a22; }
 .gg-chip.dim { opacity: .4; }
 .gg-meter { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; font-size: .68rem; font-weight: 700; color: var(--muted); }
-.gg-meter div { height: 8px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; }
-.gg-meter i { display: block; height: 100%; width: 0; background: var(--accent); }
+.gg-meter div { width: 10px; height: 48px; border-radius: 99px; background: rgba(255,255,255,.1); overflow: hidden; display: flex; align-items: flex-end; }
+.gg-meter i { display: block; width: 100%; height: 0; background: var(--accent); }
 .gg-note { font-size: .74rem; color: var(--muted); min-height: 1em; }
 @container cam (min-width: 520px) {
   .cam-wrap { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
