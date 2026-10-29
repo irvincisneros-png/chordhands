@@ -61,6 +61,7 @@ kbd { font: 600 0.7em var(--font); background: var(--tint); border: 1px solid va
 .btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .btn.primary[aria-pressed="true"] { background: var(--accent2); color: var(--on-accent2); }
 .btn[aria-pressed="true"] { border-color: var(--accent); }
+.hub-link { text-decoration: none; display: inline-flex; align-items: center; }
 .btn.small { padding: 5px 11px; min-height: 32px; font-size: 0.82rem; }
 .btn:disabled { opacity: .5; cursor: default; }
 .only-narrow { display: none; }
